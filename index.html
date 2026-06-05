@@ -1,3 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>1. FC Godesberg</title>
+<link rel="icon" href="logo.png">
+<meta name="theme-color" content="#b91c1c">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FC Godesberg">
+<meta name="mobile-web-app-capable" content="yes">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{background:#0f172a;} ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig = {
+apiKey: "AIzaSyBL6sD5N38sRygqaJdQBNq-6NAE51CyCDw",
+authDomain: "fcgapp-2026-intern.firebaseapp.com",
+projectId: "fcgapp-2026-intern",
+storageBucket: "fcgapp-2026-intern.firebasestorage.app",
+messagingSenderId: "200140077097",
+appId: "1:200140077097:web:570c5e6b10f36dd7850438"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+// Firebase-Funktionen global verfügbar machen für die React-App
+window.fb = {
+// Wert speichern (key -> beliebiges JSON)
+set: async (key, value) => {
+await setDoc(doc(db, "shared", key), { value: JSON.stringify(value) });
+},
+// Wert löschen
+del: async (key) => {
+await deleteDoc(doc(db, "shared", key));
+},
+// Echtzeit-Listener: ruft cb(value) bei jeder Änderung auf
+listen: (key, cb) => {
+return onSnapshot(doc(db, "shared", key), (snap) => {
+if (snap.exists() && snap.data().value) {
+try { cb(JSON.parse(snap.data().value)); } catch(e) { cb(null); }
+} else {
+cb(null);
+}
+}, (err) => { console.warn("Firestore listen error:", key, err); });
+}
+};
+window.dispatchEvent(new Event("fb-ready"));
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const LOGO = "logo.png";
+const SHOP_BANNER = "banner.jpg";
+const ADMIN_NICK = "Oguzhan";
+const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_CLASSES = [
+{ id: 1, name: 'Bambini', units: [] },
+{ id: 2, name: 'G-Jugend', units: [] },
+{ id: 3, name: 'F-Jugend', units: [{ id: 301, team: 'F3', time: '16:00' }] },
+{ id: 4, name: 'E-Jugend', units: [] },
+{ id: 5, name: 'D-Jugend', units: [] },
+{ id: 6, name: 'C-Jugend', units: [] },
+{ id: 7, name: 'B-Jugend', units: [] },
+{ id: 8, name: 'A-Jugend', units: [] },
+];
+const DEFAULT_EVENTS = [
+{ id: 1, title: 'Heimspiel gegen SV Rot', date: '15.06.2025', zeit: '16:00', ort: 'Heimplatz', urgent: false },
+];
+const DEFAULT_ANN = [
+{ id: 1, title: 'Neue Jako-Kollektion', desc: 'Schaut in unserem Shop vorbei!', date: '01.06' },
+];
+function App() {
+const [fbReady, setFbReady] = useState(!!window.fb);
+const [showIntro, setShowIntro] = useState(true);
+const [nickname, setNickname] = useState(localStorage.getItem('fcg_nick') || null);
+const [nickInput, setNickInput] = useState('');
+const [page, setPage] = useState('home');
+const [menuOpen, setMenuOpen] = useState(false);
+const [messages, setMessages] = useState([]);
+const [members, setMembers] = useState([]);
+const [classes, setClasses] = useState(DEFAULT_CLASSES);
+const [cancellations, setCancellations] = useState([]);
+const [platzImg, setPlatzImg] = useState(null);
+const [events, setEvents] = useState(DEFAULT_EVENTS);
+const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
+const [newMsg, setNewMsg] = useState('');
+const chatEnd = useRef(null);
+const isAdmin = nickname && nickname.toLowerCase() === ADMIN_NICK.toLowerCase();
+useEffect(() => {
+if (window.fb) { setFbReady(true); return; }
+const h = () => setFbReady(true);
+window.addEventListener('fb-ready', h);
+return () => window.removeEventListener('fb-ready', h);
+}, []);
+// Echtzeit-Listener einrichten
+useEffect(() => {
+if (!fbReady) return;
+const unsubs = [];
+unsubs.push(window.fb.listen('members', v => setMembers(v || [])));
 unsubs.push(window.fb.listen('messages', v => setMessages(v || [])));
 unsubs.push(window.fb.listen('classes', v => setClasses(v || DEFAULT_CLASSES)));
 unsubs.push(window.fb.listen('events', v => setEvents(v || DEFAULT_EVENTS)));
@@ -136,3 +244,343 @@ return (
 <button onClick={logout} className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-700 mt-auto">🚪 Abmelden</button>
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
+{page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
+{page === 'classes' && <ClassesPage {...{ classes, isAdmin, addCancellation, addUnit, delUnit, delClass, addClass }} />}
+{page === 'platz' && <PlatzPage {...{ platzImg, isAdmin, uploadPlatz, removePlatz }} />}
+{page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
+{page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
+{page === 'members' && <MembersPage {...{ members, isAdmin, removeMember }} />}
+{page === 'admin' && <AdminPage {...{ isAdmin, nickname, members, cancellations, setPage }} />}
+</main>
+</div>
+<footer className="bg-slate-900 text-slate-500 text-center py-4 border-t border-slate-800 mt-8 text-sm">1. FC Godesberg</footer>
+</div>
+);
+}
+function Intro({ onDone }) {
+useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, []);
+return (
+<div onClick={onDone} className="fixed inset-0 z-50 bg-gradient-to-b from-red-900 via-slate-900 to-black flex flex-col items-center justify-center cursor-pointer">
+<img src={LOGO} className="w-40 h-40 mb-6 drop-shadow-2xl animate-bounce" style={{ animationDuration: '2s' }} />
+<h1 className="text-4xl font-black text-white tracking-wide">1. FC GODESBERG</h1>
+<p className="absolute bottom-8 text-slate-500 text-xs">Tippen zum Überspringen</p>
+</div>
+);
+}
+function FussballWidget() {
+useEffect(() => {
+const id = 'fussballde-widgets-js';
+const old = document.getElementById(id);
+if (old) old.remove();
+const s = document.createElement('script');
+s.id = id;
+s.src = 'https://www.fussball.de/widgets.js';
+s.async = true;
+document.body.appendChild(s);
+}, []);
+return (
+<div className="bg-white rounded-lg p-2 overflow-x-auto">
+<div className="fussballde_widget" data-id="4044c76e-4baf-4d8e-8ff4-091f0dffe149" data-type="club-matches" style={{ width: '100%' }}></div>
+</div>
+);
+}
+
+function HomePage({ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }) {
+return (
+<div className="space-y-6">
+{cancellations.length > 0 && (
+<div className="bg-red-900/40 border-2 border-red-500 rounded-xl p-4">
+<h3 className="text-red-200 font-bold mb-2">⚠️ Aktuelle Trainingsabsagen</h3>
+<div className="space-y-2">
+{cancellations.slice(0, 3).map(c => (
+<div key={c.id} className="text-white text-sm bg-red-950/50 rounded-lg px-3 py-2">
+<span className="font-bold">{c.team} / {c.time}</span> fällt am <span className="font-bold">{c.date}</span> aus <span className="text-red-300">— {c.nickname}</span>
+</div>
+))}
+{cancellations.length > 3 && <button onClick={() => setPage('cancellations')} className="text-red-300 text-sm underline">+ {cancellations.length - 3} weitere</button>}
+</div>
+</div>
+)}
+<div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-6 rounded-xl shadow-lg">
+<h2 className="text-3xl font-bold mb-2">Willkommen, {nickname}! 👋</h2>
+<p>Dein zentraler Ort für alle Infos rund um den Verein</p>
+</div>
+<div>
+<h3 className="text-white text-lg font-bold mb-3">📣 Ankündigungen</h3>
+<div className="grid md:grid-cols-2 gap-4">
+{announcements.map(a => (
+<div key={a.id} className="bg-slate-800 p-4 rounded-lg border border-slate-700 relative">
+<p className="text-red-400 text-sm font-semibold">{a.date}</p>
+<h3 className="text-white font-bold mt-1">{a.title}</h3>
+<p className="text-slate-300 text-sm mt-1">{a.desc}</p>
+{isAdmin && <button onClick={() => delAnn(a.id)} className="absolute top-2 right-2 text-red-400">🗑️</button>}
+</div>
+))}
+{announcements.length === 0 && <p className="text-slate-500 text-sm">Keine Ankündigungen</p>}
+</div>
+{isAdmin && <AddForm fields={[['title', 'Titel'], ['desc', 'Text'], ['date', 'Datum (optional)']]} label="Ankündigung hinzufügen" onAdd={(f) => addAnn({ ...f, date: f.date || new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) })} req={['title']} />}
+</div>
+<div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-4">📅 Kommende Events</h3>
+<div className="space-y-3">
+{events.map(e => (
+<div key={e.id} className={"p-4 rounded-lg border-l-4 relative " + (e.urgent ? 'bg-red-900/30 border-red-500 text-red-200' : 'bg-slate-700/50 border-red-500 text-white')}>
+<div className="flex items-start justify-between">
+<div><h4 className="font-bold">{e.urgent ? '⚠️ ' : ''}{e.title}</h4><p className="text-sm opacity-90 mt-1">{e.date}{e.zeit ? ' · ' + e.zeit : ''}{e.ort ? ' · ' + e.ort : ''}</p></div>
+{isAdmin && <button onClick={() => delEvent(e.id)} className="text-red-400">🗑️</button>}
+</div>
+</div>
+))}
+{events.length === 0 && <p className="text-slate-500 text-sm">Keine Events</p>}
+</div>
+{isAdmin && <AddForm fields={[['title', 'Titel'], ['date', 'Datum'], ['zeit', 'Zeit (optional)'], ['ort', 'Ort (optional)']]} label="Event hinzufügen" onAdd={addEvent} req={['title', 'date']} />}
+</div>
+<div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-4">⚽ Nächste & letzte Spiele</h3>
+<FussballWidget />
+<p className="text-slate-500 text-xs mt-3">Live von fussball.de · aktualisiert sich automatisch</p>
+</div>
+<div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-4">Nützliche Links</h3>
+<div className="flex flex-col gap-3">
+<div className="rounded-xl overflow-hidden border border-green-700">
+<a href="https://www.fussball.de/verein/1-fc-godesberg-mittelrhein/-/id/00ES8GN91400006NVV0AG08LVUPGND5I#!/" target="_blank" className="block hover:opacity-90">
+<img src="fussball.jpg" className="w-full" />
+</a>
+<div className="bg-slate-900 px-3 py-2 border-t border-green-800">
+<p className="text-green-300 text-xs font-bold mb-2">⚽ NÄCHSTE & LETZTE SPIELE (live von fussball.de)</p>
+<iframe src="spiele.html" title="Spiele" className="w-full rounded-lg bg-slate-800" style={{height:'560px',border:'none'}} />
+</div>
+<a href="https://www.fussball.de/verein/1-fc-godesberg-mittelrhein/-/id/00ES8GN91400006NVV0AG08LVUPGND5I#!/" target="_blank" className="block bg-gradient-to-r from-green-800 to-green-900 px-5 py-3 flex items-center justify-between hover:from-green-700">
+<div><p className="text-white font-bold">fussball.de</p><p className="text-green-200 text-xs">Zur kompletten Vereinsseite →</p></div>
+<span className="text-white ml-3">↗</span>
+</a>
+</div>
+<a href="https://team.jako.com/de-de/team/1_fc_godesberg/" target="_blank" className="block rounded-xl overflow-hidden border border-slate-700 hover:border-red-500">
+<img src={SHOP_BANNER} className="w-full" />
+<div className="bg-gradient-to-r from-red-700 to-red-600 px-5 py-3 flex items-center justify-between">
+<div><p className="text-white font-bold">Vereinsshop</p><p className="text-red-100 text-xs">Einfache Online-Bestellungen für Trainer, Spieler, Eltern und Fans</p></div>
+<span className="text-white ml-3">↗</span>
+</div>
+</a>
+</div>
+</div>
+</div>
+);
+}
+function ClassesPage({ classes, isAdmin, addCancellation, addUnit, delUnit, delClass, addClass }) {
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">⚽ Training & Absagen</h2>
+<p className="text-slate-400 text-sm">Klasse antippen → Einheit wählen → bei Bedarf absagen</p>
+<div className="space-y-3">
+{classes.map(c => <ClassFolder key={c.id} cls={c} isAdmin={isAdmin} onCancel={addCancellation} onAddUnit={addUnit} onDelUnit={delUnit} onDelClass={delClass} />)}
+</div>
+{isAdmin && <AddForm fields={[['name', 'Klassenname (z.B. F-Jugend)']]} label="Klasse hinzufügen" onAdd={(f) => addClass(f.name)} req={['name']} />}
+</div>
+);
+}
+function ClassFolder({ cls, isAdmin, onCancel, onAddUnit, onDelUnit, onDelClass }) {
+const [open, setOpen] = useState(false);
+return (
+<div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+<div className="flex items-center">
+<button onClick={() => setOpen(!open)} className="flex-1 flex items-center gap-3 p-4 text-left hover:bg-slate-700/50">
+<span className="text-xl">{open ? '📂' : '📁'}</span>
+<span className="text-white font-semibold flex-1">{cls.name}</span>
+<span className="text-slate-400 text-sm">{cls.units.length} Einheit{cls.units.length !== 1 ? 'en' : ''}</span>
+<span className={"text-slate-400 transition-transform " + (open ? 'rotate-90' : '')}>›</span>
+</button>
+{isAdmin && <button onClick={() => onDelClass(cls.id)} className="text-slate-600 hover:text-red-400 px-3">🗑️</button>}
+</div>
+{open && (
+<div className="border-t border-slate-700 p-3 space-y-2">
+{cls.units.length === 0 && <p className="text-slate-500 text-sm px-2">Noch keine Einheiten</p>}
+{cls.units.map(u => <UnitRow key={u.id} cls={cls} unit={u} isAdmin={isAdmin} onCancel={onCancel} onDelUnit={onDelUnit} />)}
+{isAdmin && <AddUnitForm classId={cls.id} onAdd={onAddUnit} />}
+</div>
+)}
+</div>
+);
+}
+function UnitRow({ cls, unit, isAdmin, onCancel, onDelUnit }) {
+const [open, setOpen] = useState(false);
+const [date, setDate] = useState('');
+const submit = () => { if (!date.trim()) return; onCancel(cls.name, unit.team, unit.time, date.trim()); setDate(''); setOpen(false); alert('Absage eingetragen! Alle sehen es jetzt.'); };
+return (
+<div className="bg-slate-700/50 rounded-lg p-3">
+<div className="flex items-center justify-between gap-2">
+<div className="text-white font-semibold">{unit.team} <span className="text-slate-400 font-normal">/ {unit.time}</span></div>
+<div className="flex items-center gap-2">
+<button onClick={() => setOpen(!open)} className="bg-red-700 hover:bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg font-semibold">Absagen</button>
+{isAdmin && <button onClick={() => onDelUnit(cls.id, unit.id)} className="text-slate-500 hover:text-red-400">🗑️</button>}
+</div>
+</div>
+{open && (
+<div className="mt-3 flex gap-2">
+<input value={date} onChange={e => setDate(e.target.value)} onKeyPress={e => e.key === 'Enter' && submit()} placeholder="Datum (z.B. 18.06.)" className="flex-1 bg-slate-800 text-white rounded px-3 py-2 text-sm" />
+<button onClick={submit} className="bg-red-700 hover:bg-red-600 text-white px-4 rounded font-semibold text-sm">Bestätigen</button>
+</div>
+)}
+</div>
+);
+}
+function AddUnitForm({ classId, onAdd }) {
+const [open, setOpen] = useState(false);
+const [team, setTeam] = useState(''); const [time, setTime] = useState('');
+const submit = () => { if (!team.trim() || !time.trim()) return; onAdd(classId, team.trim(), time.trim()); setTeam(''); setTime(''); setOpen(false); };
+if (!open) return <button onClick={() => setOpen(true)} className="text-green-400 text-sm px-2 py-1">+ Einheit hinzufügen</button>;
+return (
+<div className="bg-slate-800 p-3 rounded-lg border border-green-700 space-y-2">
+<input placeholder="Team (z.B. F3)" value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<input placeholder="Zeit (z.B. 16:00)" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<div className="flex gap-2"><button onClick={submit} className="flex-1 bg-green-700 text-white py-2 rounded text-sm">✓ Speichern</button><button onClick={() => setOpen(false)} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button></div>
+</div>
+);
+}
+function PlatzPage({ platzImg, isAdmin, uploadPlatz, removePlatz }) {
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">📋 Platzbelegung</h2>
+{platzImg ? (
+<div className="space-y-3">
+<div className="bg-slate-800 rounded-xl border border-slate-700 p-3"><img src={platzImg} className="w-full rounded-lg" /></div>
+<a href={platzImg} download="platzbelegung.jpg" className="inline-block text-red-400 text-sm">↗ Bild herunterladen</a>
+{isAdmin && <button onClick={removePlatz} className="block bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">🗑️ Bild entfernen</button>}
+</div>
+) : (
+<div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
+<p className="text-5xl mb-3">📁</p>
+<p className="text-slate-400">Noch keine Platzbelegung hochgeladen</p>
+</div>
+)}
+{isAdmin && (
+<div className="bg-slate-800 rounded-xl border border-green-700 p-4">
+<p className="text-white font-semibold mb-2">{platzImg ? 'Anderes Bild hochladen' : 'Platzbelegung hochladen'}</p>
+<label className="inline-block bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold cursor-pointer">+ Bild auswählen (JPG/PNG)<input type="file" accept="image/*" className="hidden" onChange={e => uploadPlatz(e.target.files[0])} /></label>
+<p className="text-slate-500 text-xs mt-2">Foto vom Aushang reicht! Wird automatisch verkleinert.</p>
+</div>
+)}
+</div>
+);
+}
+function CancellationsPage({ cancellations, isAdmin, nickname, delCancellation }) {
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">⚠️ Absagen-Liste</h2>
+<p className="text-slate-400 text-sm">Einträge werden nach 30 Tagen automatisch gelöscht</p>
+<div className="space-y-2">
+{cancellations.length === 0 && <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 border border-slate-700">Keine aktuellen Absagen 🎉</div>}
+{cancellations.map(c => (
+<div key={c.id} className="bg-slate-800 border border-red-700/50 rounded-lg p-4 flex items-start justify-between">
+<div>
+<p className="text-white font-bold">{c.team} / {c.time} <span className="text-red-400 font-normal">({c.classN})</span></p>
+<p className="text-red-300 text-sm mt-1">fällt aus am {c.date}</p>
+<p className="text-slate-400 text-xs mt-1">Abgesagt von {c.nickname}</p>
+</div>
+{(isAdmin || c.nickname === nickname) && <button onClick={() => delCancellation(c.id)} className="text-slate-500 hover:text-red-400">🗑️</button>}
+</div>
+))}
+</div>
+</div>
+);
+}
+function ChatPage({ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }) {
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">💬 Vereins-Chat</h2>
+<div className="bg-slate-800 rounded-xl border border-slate-700 flex flex-col" style={{ height: '28rem' }}>
+<div className="flex-1 overflow-y-auto p-4 space-y-3">
+{messages.length === 0 && <p className="text-slate-500 text-center mt-8">Noch keine Nachrichten. Schreib die erste! 👋</p>}
+{messages.map(m => (
+<div key={m.id} className={"flex " + (m.user === nickname ? 'justify-end' : 'justify-start')}>
+<div className={"max-w-xs px-4 py-2 rounded-lg " + (m.user === nickname ? 'bg-red-700 text-white' : 'bg-slate-700 text-slate-100')}>
+{m.user !== nickname && <p className="text-xs opacity-75 font-semibold mb-1">{m.user}</p>}
+<p className="text-sm break-words">{m.text}</p>
+<p className="text-xs opacity-60 mt-1">{m.time}</p>
+</div>
+</div>
+))}
+<div ref={chatEnd} />
+</div>
+<div className="border-t border-slate-700 p-4 flex gap-2">
+<input value={newMsg} onChange={e => setNewMsg(e.target.value)} onKeyPress={e => e.key === 'Enter' && sendMessage()} placeholder="Nachricht schreiben..." className="flex-1 bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500" />
+<button onClick={sendMessage} className="bg-red-700 hover:bg-red-600 text-white px-4 rounded-lg">➤</button>
+</div>
+</div>
+<p className="text-slate-500 text-xs text-center">Nachrichten sind für alle Mitglieder sichtbar</p>
+</div>
+);
+}
+function MembersPage({ members, isAdmin, removeMember }) {
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">👥 Mitglieder ({members.length})</h2>
+<div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700">
+{members.length === 0 && <p className="text-slate-500 p-6 text-center">Noch keine Mitglieder</p>}
+{members.map((m, i) => (
+<div key={i} className="flex items-center justify-between p-4">
+<div className="flex items-center gap-3">
+<div className="w-10 h-10 bg-red-700 rounded-full flex items-center justify-center text-white font-bold">{m.nickname.charAt(0).toUpperCase()}</div>
+<div><p className="text-white font-semibold">{m.nickname}{m.nickname.toLowerCase() === ADMIN_NICK.toLowerCase() ? ' 👑' : ''}</p><p className="text-slate-400 text-xs">Beigetreten: {m.joined}</p></div>
+</div>
+{isAdmin && m.nickname.toLowerCase() !== ADMIN_NICK.toLowerCase() && <button onClick={() => removeMember(m.nickname)} className="text-red-400 hover:text-red-300 p-2">🗑️</button>}
+</div>
+))}
+</div>
+</div>
+);
+}
+function AdminPage({ isAdmin, nickname, members, cancellations, setPage }) {
+if (!isAdmin) return (
+<div className="space-y-6">
+<h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
+<div className="bg-yellow-900/30 border border-yellow-600 text-yellow-200 p-6 rounded-lg">
+<p className="font-semibold mb-2">🔒 Nur für Admins</p>
+<p className="text-sm">Nur der Admin (Nickname "{ADMIN_NICK}") sieht diesen Bereich. Du bist als "{nickname}" angemeldet.</p>
+</div>
+</div>
+);
+return (
+<div className="space-y-6">
+<h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
+<div className="bg-green-900/30 border border-green-600 text-green-200 p-4 rounded-lg"><p className="font-semibold">👑 Willkommen, Admin!</p><p className="text-sm mt-1">Unter "Training & Absagen" legst du Klassen & Einheiten an.</p></div>
+<div className="grid md:grid-cols-2 gap-6">
+<div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-4">Admin-Kontakt</h3>
+<div className="space-y-3 text-sm">
+<div><p className="text-slate-400">Name:</p><p className="text-white font-semibold">Oguzhan Pekistiren</p></div>
+<div><p className="text-slate-400">Email:</p><a href="mailto:oguzhanpekistiren@gmail.com" className="text-red-400 break-all">oguzhanpekistiren@gmail.com</a></div>
+<div><p className="text-slate-400">Telefon:</p><a href="tel:015222758894" className="text-red-400">015222758894</a></div>
+</div>
+</div>
+<div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-4">Schnellzugriff</h3>
+<button onClick={() => setPage('classes')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg mb-2">Klassen & Einheiten</button>
+<button onClick={() => setPage('members')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg mb-2">Mitglieder ({members.length})</button>
+<button onClick={() => setPage('cancellations')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg">Absagen ({cancellations.length})</button>
+</div>
+</div>
+</div>
+);
+}
+// Generisches Formular
+function AddForm({ fields, label, onAdd, req }) {
+const [open, setOpen] = useState(false);
+const [vals, setVals] = useState({});
+const submit = () => {
+for (const r of (req || [])) if (!vals[r] || !vals[r].trim()) return;
+onAdd(vals); setVals({}); setOpen(false);
+};
+if (!open) return <button onClick={() => setOpen(true)} className="mt-3 bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">+ {label}</button>;
+return (
+<div className="mt-3 bg-slate-800 p-4 rounded-xl border border-green-700 space-y-2">
+{fields.map(([k, ph]) => <input key={k} placeholder={ph} value={vals[k] || ''} onChange={e => setVals({ ...vals, [k]: e.target.value })} className="w-full bg-slate-700 text-white rounded px-3 py-2" />)}
+<div className="flex gap-2"><button onClick={submit} className="flex-1 bg-green-700 text-white py-2 rounded">✓ Speichern</button><button onClick={() => setOpen(false)} className="bg-slate-600 text-white py-2 px-4 rounded">Abbrechen</button></div>
+</div>
+);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html> 
