@@ -61,6 +61,7 @@ const { useState, useEffect, useRef } = React;
 const LOGO = "logo.png";
 const SHOP_BANNER = "banner.jpg";
 const ADMIN_NICK = "Oguzhan";
+const ADMIN_CODE = "Godesberg1919";
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_CLASSES = [
 { id: 1, name: 'Bambini', units: [] },
@@ -83,6 +84,9 @@ const [fbReady, setFbReady] = useState(!!window.fb);
 const [showIntro, setShowIntro] = useState(true);
 const [nickname, setNickname] = useState(localStorage.getItem('fcg_nick') || null);
 const [nickInput, setNickInput] = useState('');
+const [adminInput, setAdminInput] = useState('');
+const [showAdminLogin, setShowAdminLogin] = useState(false);
+const [isAdmin, setIsAdmin] = useState(localStorage.getItem('fcg_admin') === '1');
 const [page, setPage] = useState('home');
 const [menuOpen, setMenuOpen] = useState(false);
 const [messages, setMessages] = useState([]);
@@ -94,7 +98,6 @@ const [events, setEvents] = useState(DEFAULT_EVENTS);
 const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
 const [newMsg, setNewMsg] = useState('');
 const chatEnd = useRef(null);
-const isAdmin = nickname && nickname.toLowerCase() === ADMIN_NICK.toLowerCase();
 useEffect(() => {
 if (window.fb) { setFbReady(true); return; }
 const h = () => setFbReady(true);
@@ -124,6 +127,10 @@ useEffect(() => { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior
 function joinClub() {
 const nick = nickInput.trim();
 if (!nick) return;
+if (nick.toLowerCase() === ADMIN_NICK.toLowerCase()) {
+alert('Dieser Name ist reserviert. Bitte wähle einen anderen Namen.');
+return;
+}
 localStorage.setItem('fcg_nick', nick);
 setNickname(nick);
 setPage('home');
@@ -133,7 +140,24 @@ const m = [...members, { nickname: nick, joined: new Date().toLocaleDateString('
 window.fb.set('members', m);
 }
 }
-function logout() { localStorage.removeItem('fcg_nick'); setNickname(null); setNickInput(''); }
+function adminLogin() {
+if (adminInput === ADMIN_CODE) {
+localStorage.setItem('fcg_admin', '1');
+localStorage.setItem('fcg_nick', ADMIN_NICK);
+setIsAdmin(true);
+setNickname(ADMIN_NICK);
+setPage('home');
+setAdminInput('');
+const exists = members.find(x => x.nickname.toLowerCase() === ADMIN_NICK.toLowerCase());
+if (!exists) {
+window.fb.set('members', [...members, { nickname: ADMIN_NICK, joined: new Date().toLocaleDateString('de-DE') }]);
+}
+} else {
+alert('Falscher Admin-Code!');
+setAdminInput('');
+}
+}
+function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); setNickname(null); setIsAdmin(false); setNickInput(''); setAdminInput(''); setShowAdminLogin(false); }
 function sendMessage() {
 if (!newMsg.trim()) return;
 const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
@@ -203,6 +227,20 @@ return (
 placeholder="Dein Nickname..." maxLength={20}
 className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
 <button onClick={joinClub} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Beitreten</button>
+</div>
+<div className="mt-4">
+{!showAdminLogin ? (
+<button onClick={() => setShowAdminLogin(true)} className="text-slate-500 text-xs hover:text-slate-300">🔒 Admin-Login</button>
+) : (
+<div className="bg-slate-800 p-4 rounded-xl border border-yellow-700/50">
+<p className="text-white text-sm font-semibold mb-2">🔒 Admin-Anmeldung</p>
+<input type="password" value={adminInput} onChange={e => setAdminInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && adminLogin()}
+placeholder="Admin-Code..." autoComplete="off"
+className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 text-center" />
+<button onClick={adminLogin} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg font-bold text-sm">Als Admin anmelden 👑</button>
+<button onClick={() => { setShowAdminLogin(false); setAdminInput(''); }} className="w-full text-slate-400 text-xs mt-2">Abbrechen</button>
+</div>
+)}
 </div>
 <p className="text-slate-500 text-xs mt-4">Kein Passwort nötig – einfach Nickname wählen</p>
 </div>
