@@ -485,7 +485,7 @@ return (
 <div className="grid md:grid-cols-2 gap-4">
 {announcements.map(a => (
 <div key={a.id} className="bg-slate-800 rounded-lg border border-slate-700 relative overflow-hidden">
-{a.img && <img src={a.img} className="w-full max-h-64 object-cover" />}
+{a.img && <img src={a.img} className="w-full object-contain bg-slate-900" />}
 <div className="p-4">
 <p className="text-red-400 text-sm font-semibold">{a.date}</p>
 {a.title && <h3 className="text-white font-bold mt-1">{a.title}</h3>}
@@ -810,7 +810,7 @@ return (
 <textarea placeholder="Text (optional)" value={desc} onChange={e => setDesc(e.target.value)} rows={3} className="w-full bg-slate-700 text-white rounded px-3 py-2" />
 {img ? (
 <div className="relative">
-<img src={img} className="w-full max-h-48 object-cover rounded-lg" />
+<img src={img} className="w-full object-contain bg-slate-900 rounded-lg" />
 <button onClick={() => setImg(null)} className="absolute top-2 right-2 bg-red-700 text-white rounded-full w-8 h-8">✕</button>
 </div>
 ) : (
