@@ -113,7 +113,7 @@ console.warn("Push (Ankündigung) konnte nicht gesendet werden:", e);
 // Wochentage: 0=Sonntag, 1=Montag, ... 6=Samstag
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 // Buchstaben-Gruppen (von G/Bambini bis A)
-const LETTERS = ['Bambini', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
+const LETTERS = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
 const NUMBERS = [1, 2, 3, 4];
 // Teams: key = "C3", value = { day, time }
 // Trainer pflegt hier Wochentag + Zeit. Admin kann alles ändern.
@@ -150,10 +150,10 @@ function formatDatum(d) {
 return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 function teamKey(letter, num) {
-return (letter === 'Bambini' ? 'Bambini' : letter) + num;
+return letter + num;
 }
 function teamLabel(letter, num) {
-return (letter === 'Bambini' ? 'Bambini ' : letter) + num;
+return letter + num;
 }
 const DEFAULT_EVENTS = [
 { id: 1, title: 'Heimspiel gegen SV Rot', date: '15.06.2025', zeit: '16:00', ort: 'Heimplatz', urgent: false },
@@ -557,7 +557,7 @@ return (
 <div className="space-y-2">
 {LETTERS.map(l => (
 <button key={l} onClick={() => { setLetter(l); }} className={"w-full py-3 rounded-lg font-bold text-lg transition " + (letter === l ? 'bg-red-700 text-white' : 'bg-slate-700 text-slate-200 hover:bg-slate-600')}>
-{l === 'Bambini' ? 'Bambini' : l}
+{l}
 </button>
 ))}
 </div>
