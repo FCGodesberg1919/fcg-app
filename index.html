@@ -93,16 +93,53 @@ trainer: nickname
 console.warn("Push konnte nicht gesendet werden:", e);
 }
 }
+// Push für freie Ankündigungen (Titel + Text)
+async function sendePushAnn(titel, text) {
+try {
+await fetch(PUSH_WORKER_URL, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({
+team: titel || "Neue Ankündigung",
+grund: text || "",
+uhrzeit: "",
+trainer: ""
+})
+});
+} catch (e) {
+console.warn("Push (Ankündigung) konnte nicht gesendet werden:", e);
+}
+}
+// Wochentage: 0=Sonntag, 1=Montag, ... 6=Samstag
+const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 const DEFAULT_CLASSES = [
 { id: 1, name: 'Bambini', units: [] },
 { id: 2, name: 'G-Jugend', units: [] },
-{ id: 3, name: 'F-Jugend', units: [{ id: 301, team: 'F3', time: '16:00' }] },
+{ id: 3, name: 'F-Jugend', units: [{ id: 301, team: 'F3', day: 2, time: '16:00' }] },
 { id: 4, name: 'E-Jugend', units: [] },
 { id: 5, name: 'D-Jugend', units: [] },
-{ id: 6, name: 'C-Jugend', units: [{ id: 601, team: 'C3', time: '18:00' }] },
+{ id: 6, name: 'C-Jugend', units: [{ id: 601, team: 'C3', day: 1, time: '18:15 – 19:45' }] },
 { id: 7, name: 'B-Jugend', units: [] },
 { id: 8, name: 'A-Jugend', units: [] },
 ];
+// Berechnet die nächsten Termine (3 Monate) für einen Wochentag
+function naechsteTermine(weekday, monate) {
+const out = [];
+if (weekday === undefined || weekday === null || weekday === '') return out;
+const wd = Number(weekday);
+const today = new Date(); today.setHours(0,0,0,0);
+const ende = new Date(today); ende.setMonth(ende.getMonth() + (monate || 3));
+const d = new Date(today);
+while (d.getDay() !== wd) d.setDate(d.getDate() + 1);
+while (d <= ende) {
+out.push(new Date(d));
+d.setDate(d.getDate() + 7);
+}
+return out;
+}
+function formatDatum(d) {
+return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+}
 const DEFAULT_EVENTS = [
 { id: 1, title: 'Heimspiel gegen SV Rot', date: '15.06.2025', zeit: '16:00', ort: 'Heimplatz', urgent: false },
 ];
@@ -202,8 +239,11 @@ window.fb.set('cancellations', [c, ...cancellations]);
 sendePush(team, time, date, classN, nickname);
 }
 function delCancellation(id) { window.fb.set('cancellations', cancellations.filter(c => c.id !== id)); }
-function addUnit(classId, team, time) {
-window.fb.set('classes', classes.map(c => c.id === classId ? { ...c, units: [...c.units, { id: Date.now(), team, time }] } : c));
+function addUnit(classId, team, time, day) {
+window.fb.set('classes', classes.map(c => c.id === classId ? { ...c, units: [...c.units, { id: Date.now(), team, time, day: Number(day) }] } : c));
+}
+function updateUnit(classId, unitId, patch) {
+window.fb.set('classes', classes.map(c => c.id === classId ? { ...c, units: c.units.map(u => u.id === unitId ? { ...u, ...patch } : u) } : c));
 }
 function delUnit(classId, unitId) {
 window.fb.set('classes', classes.map(c => c.id === classId ? { ...c, units: c.units.filter(u => u.id !== unitId) } : c));
@@ -212,7 +252,10 @@ function addClass(name) { window.fb.set('classes', [...classes, { id: Date.now()
 function delClass(classId) { window.fb.set('classes', classes.filter(c => c.id !== classId)); }
 function addEvent(item) { window.fb.set('events', [...events, { ...item, id: Date.now() }]); }
 function delEvent(id) { window.fb.set('events', events.filter(e => e.id !== id)); }
-function addAnn(item) { window.fb.set('announcements', [...announcements, { ...item, id: Date.now() }]); }
+function addAnn(item) {
+window.fb.set('announcements', [...announcements, { ...item, id: Date.now() }]);
+sendePushAnn(item.title, item.desc);
+}
 function delAnn(id) { window.fb.set('announcements', announcements.filter(a => a.id !== id)); }
 function uploadPlatz(file) {
 if (!file) return;
@@ -315,7 +358,7 @@ return (
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
 {page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
-{page === 'classes' && <ClassesPage {...{ classes, isAdmin, addCancellation, addUnit, delUnit, delClass, addClass }} />}
+{page === 'classes' && <ClassesPage {...{ classes, isAdmin, addCancellation, addUnit, updateUnit, delUnit, delClass, addClass }} />}
 {page === 'platz' && <PlatzPage {...{ platzImg, isAdmin, uploadPlatz, removePlatz }} />}
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
@@ -417,16 +460,19 @@ return (
 <h3 className="text-white text-lg font-bold mb-3">📣 Ankündigungen</h3>
 <div className="grid md:grid-cols-2 gap-4">
 {announcements.map(a => (
-<div key={a.id} className="bg-slate-800 p-4 rounded-lg border border-slate-700 relative">
+<div key={a.id} className="bg-slate-800 rounded-lg border border-slate-700 relative overflow-hidden">
+{a.img && <img src={a.img} className="w-full max-h-64 object-cover" />}
+<div className="p-4">
 <p className="text-red-400 text-sm font-semibold">{a.date}</p>
-<h3 className="text-white font-bold mt-1">{a.title}</h3>
-<p className="text-slate-300 text-sm mt-1">{a.desc}</p>
-{isAdmin && <button onClick={() => delAnn(a.id)} className="absolute top-2 right-2 text-red-400">🗑️</button>}
+{a.title && <h3 className="text-white font-bold mt-1">{a.title}</h3>}
+{a.desc && <p className="text-slate-300 text-sm mt-1">{a.desc}</p>}
+</div>
+{isAdmin && <button onClick={() => delAnn(a.id)} className="absolute top-2 right-2 text-red-400 bg-slate-900/70 rounded-full w-8 h-8">🗑️</button>}
 </div>
 ))}
 {announcements.length === 0 && <p className="text-slate-500 text-sm">Keine Ankündigungen</p>}
 </div>
-{isAdmin && <AddForm fields={[['title', 'Titel'], ['desc', 'Text'], ['date', 'Datum (optional)']]} label="Ankündigung hinzufügen" onAdd={(f) => addAnn({ ...f, date: f.date || new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) })} req={['title']} />}
+{isAdmin && <AddAnnForm onAdd={addAnn} />}
 </div>
 <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
 <h3 className="text-white text-xl font-bold mb-4">📅 Kommende Events</h3>
@@ -471,27 +517,27 @@ return (
 </div>
 );
 }
-function ClassesPage({ classes, isAdmin, addCancellation, addUnit, delUnit, delClass, addClass }) {
+function ClassesPage({ classes, isAdmin, addCancellation, addUnit, updateUnit, delUnit, delClass, addClass }) {
 return (
 <div className="space-y-4">
 <h2 className="text-2xl font-bold text-white">⚽ Training & Absagen</h2>
-<p className="text-slate-400 text-sm">Klasse antippen → Einheit wählen → bei Bedarf absagen</p>
-<div className="space-y-3">
-{classes.map(c => <ClassFolder key={c.id} cls={c} isAdmin={isAdmin} onCancel={addCancellation} onAddUnit={addUnit} onDelUnit={delUnit} onDelClass={delClass} />)}
+<p className="text-slate-400 text-sm">Klasse antippen → Einheit wählen → Datum anklicken → fertig</p>
+<div className="grid sm:grid-cols-2 gap-3">
+{classes.map(c => <ClassFolder key={c.id} cls={c} isAdmin={isAdmin} onCancel={addCancellation} onAddUnit={addUnit} onUpdateUnit={updateUnit} onDelUnit={delUnit} onDelClass={delClass} />)}
 </div>
 {isAdmin && <AddForm fields={[['name', 'Klassenname (z.B. F-Jugend)']]} label="Klasse hinzufügen" onAdd={(f) => addClass(f.name)} req={['name']} />}
 </div>
 );
 }
-function ClassFolder({ cls, isAdmin, onCancel, onAddUnit, onDelUnit, onDelClass }) {
+function ClassFolder({ cls, isAdmin, onCancel, onAddUnit, onUpdateUnit, onDelUnit, onDelClass }) {
 const [open, setOpen] = useState(false);
 return (
-<div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+<div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden self-start">
 <div className="flex items-center">
 <button onClick={() => setOpen(!open)} className="flex-1 flex items-center gap-3 p-4 text-left hover:bg-slate-700/50">
 <span className="text-xl">{open ? '📂' : '📁'}</span>
 <span className="text-white font-semibold flex-1">{cls.name}</span>
-<span className="text-slate-400 text-sm">{cls.units.length} Einheit{cls.units.length !== 1 ? 'en' : ''}</span>
+<span className="text-slate-400 text-xs">{cls.units.length}</span>
 <span className={"text-slate-400 transition-transform " + (open ? 'rotate-90' : '')}>›</span>
 </button>
 {isAdmin && <button onClick={() => onDelClass(cls.id)} className="text-slate-600 hover:text-red-400 px-3">🗑️</button>}
@@ -499,44 +545,90 @@ return (
 {open && (
 <div className="border-t border-slate-700 p-3 space-y-2">
 {cls.units.length === 0 && <p className="text-slate-500 text-sm px-2">Noch keine Einheiten</p>}
-{cls.units.map(u => <UnitRow key={u.id} cls={cls} unit={u} isAdmin={isAdmin} onCancel={onCancel} onDelUnit={onDelUnit} />)}
+{cls.units.map(u => <UnitRow key={u.id} cls={cls} unit={u} isAdmin={isAdmin} onCancel={onCancel} onUpdateUnit={onUpdateUnit} onDelUnit={onDelUnit} />)}
 {isAdmin && <AddUnitForm classId={cls.id} onAdd={onAddUnit} />}
 </div>
 )}
 </div>
 );
 }
-function UnitRow({ cls, unit, isAdmin, onCancel, onDelUnit }) {
+function UnitRow({ cls, unit, isAdmin, onCancel, onUpdateUnit, onDelUnit }) {
 const [open, setOpen] = useState(false);
-const [date, setDate] = useState('');
-const submit = () => { if (!date.trim()) return; onCancel(cls.name, unit.team, unit.time, date.trim()); setDate(''); setOpen(false); alert('Absage gesendet! Alle Mitglieder bekommen jetzt eine Benachrichtigung.'); };
+const [edit, setEdit] = useState(false);
+const termine = naechsteTermine(unit.day, 3);
+const dayLabel = (unit.day !== undefined && unit.day !== null && unit.day !== '') ? WEEKDAYS[Number(unit.day)] : 'Kein Tag';
+const absagen = (d) => {
+const datumStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+onCancel(cls.name, unit.team, unit.time, datumStr);
+setOpen(false);
+alert('Absage gesendet! Alle Mitglieder bekommen jetzt eine Benachrichtigung. 🔔');
+};
 return (
 <div className="bg-slate-700/50 rounded-lg p-3">
 <div className="flex items-center justify-between gap-2">
-<div className="text-white font-semibold">{unit.team} <span className="text-slate-400 font-normal">/ {unit.time}</span></div>
-<div className="flex items-center gap-2">
-<button onClick={() => setOpen(!open)} className="bg-red-700 hover:bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg font-semibold">Absagen</button>
+<div className="min-w-0">
+<div className="text-white font-semibold truncate">{unit.team}</div>
+<div className="text-slate-400 text-xs">{dayLabel}{unit.time ? ' · ' + unit.time : ''}</div>
+</div>
+<div className="flex items-center gap-2 shrink-0">
+<button onClick={() => { setOpen(!open); setEdit(false); }} className="bg-red-700 hover:bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg font-semibold">Absagen</button>
+{isAdmin && <button onClick={() => { setEdit(!edit); setOpen(false); }} className="text-slate-400 hover:text-yellow-400 text-sm">✏️</button>}
 {isAdmin && <button onClick={() => onDelUnit(cls.id, unit.id)} className="text-slate-500 hover:text-red-400">🗑️</button>}
 </div>
 </div>
 {open && (
-<div className="mt-3 flex gap-2">
-<input value={date} onChange={e => setDate(e.target.value)} onKeyPress={e => e.key === 'Enter' && submit()} placeholder="Datum (z.B. 18.06.)" className="flex-1 bg-slate-800 text-white rounded px-3 py-2 text-sm" />
-<button onClick={submit} className="bg-red-700 hover:bg-red-600 text-white px-4 rounded font-semibold text-sm">Bestätigen</button>
+<div className="mt-3">
+<p className="text-slate-300 text-xs mb-2">Welcher Termin fällt aus? (Tippen zum Absagen)</p>
+{termine.length === 0 ? (
+<p className="text-yellow-400 text-xs">Kein Wochentag hinterlegt. {isAdmin ? 'Bitte über ✏️ einen Tag festlegen.' : 'Bitte beim Admin melden.'}</p>
+) : (
+<div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+{termine.map((d, i) => (
+<button key={i} onClick={() => absagen(d)} className="bg-slate-800 hover:bg-red-700 text-white text-sm px-2 py-2 rounded-lg border border-slate-600 hover:border-red-500 transition">
+{formatDatum(d)}
+</button>
+))}
 </div>
 )}
+</div>
+)}
+{edit && isAdmin && (
+<EditUnitForm cls={cls} unit={unit} onSave={(patch) => { onUpdateUnit(cls.id, unit.id, patch); setEdit(false); }} onCancel={() => setEdit(false)} />
+)}
+</div>
+);
+}
+function EditUnitForm({ cls, unit, onSave, onCancel }) {
+const [team, setTeam] = useState(unit.team || '');
+const [day, setDay] = useState(unit.day !== undefined && unit.day !== null ? String(unit.day) : '');
+const [time, setTime] = useState(unit.time || '');
+const save = () => { if (!team.trim()) return; onSave({ team: team.trim(), day: day === '' ? null : Number(day), time: time.trim() }); };
+return (
+<div className="mt-3 bg-slate-800 p-3 rounded-lg border border-yellow-700 space-y-2">
+<p className="text-yellow-300 text-xs font-semibold">✏️ Einheit bearbeiten</p>
+<input placeholder="Team (z.B. C3)" value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<select value={day} onChange={e => setDay(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm">
+<option value="">— Wochentag wählen —</option>
+{WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
+</select>
+<input placeholder="Zeit (z.B. 18:15 – 19:45)" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<div className="flex gap-2"><button onClick={save} className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded text-sm">✓ Speichern</button><button onClick={onCancel} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button></div>
 </div>
 );
 }
 function AddUnitForm({ classId, onAdd }) {
 const [open, setOpen] = useState(false);
-const [team, setTeam] = useState(''); const [time, setTime] = useState('');
-const submit = () => { if (!team.trim() || !time.trim()) return; onAdd(classId, team.trim(), time.trim()); setTeam(''); setTime(''); setOpen(false); };
+const [team, setTeam] = useState(''); const [time, setTime] = useState(''); const [day, setDay] = useState('');
+const submit = () => { if (!team.trim() || day === '') return; onAdd(classId, team.trim(), time.trim(), day); setTeam(''); setTime(''); setDay(''); setOpen(false); };
 if (!open) return <button onClick={() => setOpen(true)} className="text-green-400 text-sm px-2 py-1">+ Einheit hinzufügen</button>;
 return (
 <div className="bg-slate-800 p-3 rounded-lg border border-green-700 space-y-2">
-<input placeholder="Team (z.B. F3)" value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
-<input placeholder="Zeit (z.B. 16:00)" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<input placeholder="Team (z.B. C3)" value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<select value={day} onChange={e => setDay(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm">
+<option value="">— Wochentag wählen —</option>
+{WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
+</select>
+<input placeholder="Zeit (z.B. 18:15 – 19:45)" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
 <div className="flex gap-2"><button onClick={submit} className="flex-1 bg-green-700 text-white py-2 rounded text-sm">✓ Speichern</button><button onClick={() => setOpen(false)} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button></div>
 </div>
 );
@@ -663,6 +755,61 @@ return (
 <button onClick={() => setPage('members')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg mb-2">Mitglieder ({members.length})</button>
 <button onClick={() => setPage('cancellations')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg">Absagen ({cancellations.length})</button>
 </div>
+</div>
+</div>
+);
+}
+// Ankündigungs-Formular mit optionalem Bild-Upload
+function AddAnnForm({ onAdd }) {
+const [open, setOpen] = useState(false);
+const [title, setTitle] = useState('');
+const [desc, setDesc] = useState('');
+const [img, setImg] = useState(null);
+const [busy, setBusy] = useState(false);
+function ladeBild(file) {
+if (!file) return;
+const reader = new FileReader();
+reader.onload = (e) => {
+const image = new Image();
+image.onload = () => {
+const canvas = document.createElement('canvas');
+let w = image.width, h = image.height; const maxDim = 1200;
+if (w > maxDim || h > maxDim) { if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / h); h = maxDim; } }
+canvas.width = w; canvas.height = h;
+canvas.getContext('2d').drawImage(image, 0, 0, w, h);
+setImg(canvas.toDataURL('image/jpeg', 0.8));
+};
+image.src = e.target.result;
+};
+reader.readAsDataURL(file);
+}
+const submit = () => {
+if (!title.trim() && !desc.trim() && !img) return;
+setBusy(true);
+onAdd({ title: title.trim(), desc: desc.trim(), img: img || null, date: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) });
+setTitle(''); setDesc(''); setImg(null); setBusy(false); setOpen(false);
+};
+if (!open) return <button onClick={() => setOpen(true)} className="mt-3 bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">+ Ankündigung hinzufügen</button>;
+return (
+<div className="mt-3 bg-slate-800 p-4 rounded-xl border border-green-700 space-y-3">
+<p className="text-green-300 text-sm font-semibold">📣 Neue Ankündigung</p>
+<input placeholder="Titel" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2" />
+<textarea placeholder="Text (optional)" value={desc} onChange={e => setDesc(e.target.value)} rows={3} className="w-full bg-slate-700 text-white rounded px-3 py-2" />
+{img ? (
+<div className="relative">
+<img src={img} className="w-full max-h-48 object-cover rounded-lg" />
+<button onClick={() => setImg(null)} className="absolute top-2 right-2 bg-red-700 text-white rounded-full w-8 h-8">✕</button>
+</div>
+) : (
+<label className="inline-block bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-lg font-semibold cursor-pointer text-sm">
+📷 Bild hinzufügen (optional)
+<input type="file" accept="image/*" className="hidden" onChange={e => ladeBild(e.target.files[0])} />
+</label>
+)}
+<p className="text-slate-500 text-xs">🔔 Alle Mitglieder bekommen eine Benachrichtigung. Bild wird automatisch verkleinert.</p>
+<div className="flex gap-2">
+<button onClick={submit} disabled={busy} className="flex-1 bg-green-700 hover:bg-green-600 text-white py-2 rounded disabled:opacity-50">✓ Veröffentlichen</button>
+<button onClick={() => { setOpen(false); setTitle(''); setDesc(''); setImg(null); }} className="bg-slate-600 text-white py-2 px-4 rounded">Abbrechen</button>
 </div>
 </div>
 );
