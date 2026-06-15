@@ -177,6 +177,7 @@ const [classes, setClasses] = useState(DEFAULT_CLASSES);
 const [teams, setTeams] = useState(DEFAULT_TEAMS);
 const [cancellations, setCancellations] = useState([]);
 const [platzImg, setPlatzImg] = useState(null);
+const [forms, setForms] = useState([]);
 const [events, setEvents] = useState(DEFAULT_EVENTS);
 const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
 const [newMsg, setNewMsg] = useState('');
@@ -198,6 +199,7 @@ unsubs.push(window.fb.listen('teams', v => setTeams(v || DEFAULT_TEAMS)));
 unsubs.push(window.fb.listen('events', v => setEvents(v || DEFAULT_EVENTS)));
 unsubs.push(window.fb.listen('announcements', v => setAnnouncements(v || DEFAULT_ANN)));
 unsubs.push(window.fb.listen('platzImg', v => setPlatzImg(v || null)));
+unsubs.push(window.fb.listen('forms', v => setForms(v || [])));
 unsubs.push(window.fb.listen('cancellations', v => {
 let list = v || [];
 const now = Date.now();
@@ -299,6 +301,8 @@ img.src = e.target.result;
 reader.readAsDataURL(file);
 }
 function removePlatz() { window.fb.del('platzImg'); }
+function addForm(item) { window.fb.set('forms', [{ ...item, id: Date.now() }, ...forms]); }
+function delForm(id) { window.fb.set('forms', forms.filter(f => f.id !== id)); }
 // Intro
 if (showIntro) return <Intro onDone={() => setShowIntro(false)} />;
 // Verbindung wird aufgebaut
@@ -350,6 +354,7 @@ const nav = [
 { id: 'home', label: '🏠 Home' },
 { id: 'classes', label: '⚽ Training & Absagen' },
 { id: 'platz', label: '📋 Platzbelegung' },
+{ id: 'forms', label: '📄 Formulare' },
 { id: 'cancellations', label: '⚠️ Absagen-Liste' },
 { id: 'chat', label: '💬 Chat' },
 { id: 'members', label: '👥 Mitglieder' },
@@ -384,6 +389,7 @@ return (
 {page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
 {page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, addCancellation }} />}
 {page === 'platz' && <PlatzPage {...{ platzImg, isAdmin, uploadPlatz, removePlatz }} />}
+{page === 'forms' && <FormsPage {...{ forms, isAdmin, addForm, delForm }} />}
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
 {page === 'members' && <MembersPage {...{ members, isAdmin, removeMember }} />}
@@ -669,6 +675,130 @@ return (
 <p className="text-slate-500 text-xs mt-2">Foto vom Aushang reicht! Wird automatisch verkleinert.</p>
 </div>
 )}
+</div>
+);
+}
+function FormsPage({ forms, isAdmin, addForm, delForm }) {
+async function teilen(f) {
+// Daten-URL in eine Datei umwandeln und teilen (falls unterstützt)
+try {
+const res = await fetch(f.data);
+const blob = await res.blob();
+const file = new File([blob], f.name || 'formular', { type: blob.type });
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+await navigator.share({ files: [file], title: f.title, text: f.title });
+return;
+}
+} catch (e) { console.warn('Datei-Teilen nicht möglich:', e); }
+// Fallback: nur Text/Titel teilen
+try {
+if (navigator.share) { await navigator.share({ title: f.title, text: f.title }); return; }
+} catch (e) {}
+// Letzter Fallback: Download öffnen
+const a = document.createElement('a');
+a.href = f.data; a.download = f.name || 'formular'; a.click();
+}
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">📄 Formulare</h2>
+<p className="text-slate-400 text-sm">Formulare ansehen, herunterladen oder direkt an die Eltern weiterleiten – papierlos! 🌱</p>
+{isAdmin && <AddFormUpload onAdd={addForm} />}
+<div className="space-y-3">
+{forms.length === 0 && <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 border border-slate-700">Noch keine Formulare vorhanden</div>}
+{forms.map(f => (
+<div key={f.id} className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+<div className="flex items-start justify-between gap-3">
+<div className="flex items-center gap-3 min-w-0">
+<span className="text-3xl shrink-0">{f.type && f.type.includes('pdf') ? '📕' : '🖼️'}</span>
+<div className="min-w-0">
+<p className="text-white font-semibold truncate">{f.title}</p>
+<p className="text-slate-400 text-xs">{f.date}</p>
+</div>
+</div>
+{isAdmin && <button onClick={() => delForm(f.id)} className="text-slate-500 hover:text-red-400 shrink-0">🗑️</button>}
+</div>
+<div className="flex gap-2 mt-3">
+<button onClick={() => teilen(f)} className="flex-1 bg-green-700 hover:bg-green-600 text-white py-2.5 rounded-lg font-semibold text-sm">📤 Weiterleiten</button>
+<a href={f.data} download={f.name || 'formular'} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg font-semibold text-sm text-center">⬇️ Download</a>
+{(f.type && f.type.includes('pdf')) && <a href={f.data} target="_blank" className="bg-slate-700 hover:bg-slate-600 text-white py-2.5 px-4 rounded-lg font-semibold text-sm">👁️</a>}
+</div>
+</div>
+))}
+</div>
+</div>
+);
+}
+function AddFormUpload({ onAdd }) {
+const [open, setOpen] = useState(false);
+const [title, setTitle] = useState('');
+const [data, setData] = useState(null);
+const [name, setName] = useState('');
+const [type, setType] = useState('');
+const [fehler, setFehler] = useState('');
+function ladeDatei(file) {
+if (!file) return;
+setFehler('');
+const istBild = file.type.startsWith('image/');
+const istPdf = file.type === 'application/pdf';
+if (!istBild && !istPdf) { setFehler('Bitte ein PDF oder Bild (JPG/PNG) auswählen.'); return; }
+setName(file.name);
+setType(file.type);
+if (istBild) {
+// Bild verkleinern
+const reader = new FileReader();
+reader.onload = (e) => {
+const image = new Image();
+image.onload = () => {
+const canvas = document.createElement('canvas');
+let w = image.width, h = image.height; const maxDim = 1400;
+if (w > maxDim || h > maxDim) { if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / h); h = maxDim; } }
+canvas.width = w; canvas.height = h;
+canvas.getContext('2d').drawImage(image, 0, 0, w, h);
+setData(canvas.toDataURL('image/jpeg', 0.8));
+if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
+};
+image.src = e.target.result;
+};
+reader.readAsDataURL(file);
+} else {
+// PDF: Größe prüfen (Firestore-Limit ~1MB, Daten-URL ist ~33% größer)
+if (file.size > 720 * 1024) {
+setFehler('Dieses PDF ist zu groß (' + Math.round(file.size/1024) + ' KB). Bitte ein kleineres PDF (unter ~700 KB) verwenden oder als Bild hochladen.');
+return;
+}
+const reader = new FileReader();
+reader.onload = (e) => { setData(e.target.result); if (!title) setTitle(file.name.replace(/\.[^.]+$/, '')); };
+reader.readAsDataURL(file);
+}
+}
+const submit = () => {
+if (!data) { setFehler('Bitte zuerst eine Datei auswählen.'); return; }
+if (!title.trim()) { setFehler('Bitte einen Titel eingeben.'); return; }
+onAdd({ title: title.trim(), data, name, type, date: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) });
+setTitle(''); setData(null); setName(''); setType(''); setFehler(''); setOpen(false);
+};
+if (!open) return <button onClick={() => setOpen(true)} className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">+ Formular hochladen</button>;
+return (
+<div className="bg-slate-800 p-4 rounded-xl border border-green-700 space-y-3">
+<p className="text-green-300 text-sm font-semibold">📄 Neues Formular</p>
+<input placeholder="Titel (z.B. Einverständniserklärung)" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+{data ? (
+<div className="bg-slate-900 rounded-lg p-3 flex items-center justify-between">
+<span className="text-white text-sm truncate">✓ {name}</span>
+<button onClick={() => { setData(null); setName(''); }} className="text-red-400 ml-2">✕</button>
+</div>
+) : (
+<label className="block bg-slate-600 hover:bg-slate-500 text-white px-4 py-3 rounded-lg font-semibold cursor-pointer text-sm text-center">
+📎 PDF oder Bild auswählen
+<input type="file" accept="application/pdf,image/*" className="hidden" onChange={e => ladeDatei(e.target.files[0])} />
+</label>
+)}
+{fehler && <p className="text-red-400 text-xs">{fehler}</p>}
+<p className="text-slate-500 text-xs">Bilder werden automatisch verkleinert. PDFs bitte unter ~700 KB.</p>
+<div className="flex gap-2">
+<button onClick={submit} className="flex-1 bg-green-700 hover:bg-green-600 text-white py-2 rounded">✓ Speichern</button>
+<button onClick={() => { setOpen(false); setData(null); setName(''); setTitle(''); setFehler(''); }} className="bg-slate-600 text-white py-2 px-4 rounded">Abbrechen</button>
+</div>
 </div>
 );
 }
