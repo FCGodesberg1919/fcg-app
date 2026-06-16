@@ -1,16 +1,16 @@
-name: APK bauen
+name: APK komplett bauen
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Code auschecken
         uses: actions/checkout@v4
 
-      - name: Java einrichten
+      - name: Java (JDK 17) einrichten
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -24,40 +24,61 @@ jobs:
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v3
 
+      - name: Build-Tools installieren
+        run: sdkmanager "build-tools;34.0.0" "platforms;android-34"
+
       - name: Bubblewrap installieren
         run: npm install -g @bubblewrap/cli
 
-      - name: Signierungs-Schluessel erstellen
+      - name: Bubblewrap-Config vorab setzen
+        run: |
+          mkdir -p ~/.bubblewrap
+          printf '{\n  "jdkPath": "%s",\n  "androidSdkPath": "%s"\n}\n' "$JAVA_HOME" "$ANDROID_SDK_ROOT" > ~/.bubblewrap/config.json
+          cat ~/.bubblewrap/config.json
+
+      - name: Signier-Schluessel erstellen
         run: |
           keytool -genkeypair \
             -dname "CN=FC Godesberg, OU=Verein, O=FC Godesberg, L=Bonn, ST=NRW, C=DE" \
-            -alias fcg \
-            -keypass fcgodesberg \
-            -keystore android.keystore \
-            -storepass fcgodesberg \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
+            -alias fcg -keypass fcgodesberg \
+            -keystore "$GITHUB_WORKSPACE/android.keystore" \
+            -storepass fcgodesberg -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: APK bauen
+      - name: Android-Projekt aus twa-manifest erzeugen
         run: |
-          bubblewrap build \
-            --skipPwaValidation \
-            --skipSigning=false << 'EOF'
-          fcgodesberg
-          fcgodesberg
-          EOF
+          # update generiert das Android-Projekt aus der vorhandenen twa-manifest.json
+          bubblewrap update --skipVersionUpgrade 2>&1 | tee update.log || echo "update fertig"
+          echo "--- Dateien nach update ---"
+          ls -la
 
-      - name: APK umbenennen
+      - name: Gradle-Build (erzeugt unsignierte APK)
         run: |
-          for f in *.apk; do
-            cp "$f" "FC-Godesberg-$f" 2>/dev/null || true
-          done
-          ls -la *.apk || echo "Keine APK gefunden"
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleRelease --no-daemon 2>&1 | tail -30
+          else
+            echo "Kein gradlew vorhanden, Inhalt:"
+            ls -la
+            exit 1
+          fi
 
-      - name: APK als Download bereitstellen
+      - name: APK suchen + signieren
+        run: |
+          BT="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+          APK=$(find . -name "*-release-unsigned.apk" -o -name "*-release.apk" 2>/dev/null | grep -v signed | head -1)
+          echo "Gefundene APK: $APK"
+          if [ -z "$APK" ]; then echo "FEHLER: keine APK"; find . -name "*.apk"; exit 1; fi
+          "$BT/zipalign" -v -p 4 "$APK" aligned.apk
+          "$BT/apksigner" sign --ks "$GITHUB_WORKSPACE/android.keystore" \
+            --ks-key-alias fcg --ks-pass pass:fcgodesberg --key-pass pass:fcgodesberg \
+            --out FC-Godesberg.apk aligned.apk
+          "$BT/apksigner" verify --verbose FC-Godesberg.apk
+          echo "--- FERTIG ---"
+          ls -la FC-Godesberg.apk
+
+      - name: Signierte APK bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: FC-Godesberg-APK
-          path: '*.apk'
+          name: FC-Godesberg-APK-fertig
+          path: FC-Godesberg.apk
           if-no-files-found: warn
