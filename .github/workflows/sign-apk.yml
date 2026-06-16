@@ -26,7 +26,7 @@ jobs:
 
       - name: APK aus Base64-Text wiederherstellen
         run: |
-          base64 -d apk-base64.txt > FC_Godesberg-unsigned.apk
+          tr -d "[:space:]" < apk-base64.txt | base64 -d -i > FC_Godesberg-unsigned.apk
           echo "--- Wiederhergestellte APK pruefen ---"
           ls -la FC_Godesberg-unsigned.apk
           file FC_Godesberg-unsigned.apk
