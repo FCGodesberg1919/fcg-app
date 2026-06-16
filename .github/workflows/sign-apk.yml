@@ -1,0 +1,64 @@
+name: APK signieren
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sign-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Java (JDK 17) einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Android SDK + Build-Tools einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Build-Tools installieren (enthaelt apksigner + zipalign)
+        run: |
+          sdkmanager "build-tools;34.0.0"
+          echo "BUILD_TOOLS=$ANDROID_SDK_ROOT/build-tools/34.0.0" >> $GITHUB_ENV
+
+      - name: Signierungs-Schluessel erstellen
+        run: |
+          keytool -genkeypair \
+            -dname "CN=FC Godesberg, OU=Verein, O=FC Godesberg, L=Bonn, ST=NRW, C=DE" \
+            -alias fcg \
+            -keypass fcgodesberg \
+            -keystore "$GITHUB_WORKSPACE/fcg.keystore" \
+            -storepass fcgodesberg \
+            -keyalg RSA -keysize 2048 -validity 10000
+          echo "Schluessel erstellt."
+
+      - name: APK optimieren (zipalign)
+        run: |
+          "$BUILD_TOOLS/zipalign" -v -p 4 \
+            FC_Godesberg-unsigned.apk \
+            FC_Godesberg-aligned.apk
+
+      - name: APK signieren (apksigner)
+        run: |
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$GITHUB_WORKSPACE/fcg.keystore" \
+            --ks-key-alias fcg \
+            --ks-pass pass:fcgodesberg \
+            --key-pass pass:fcgodesberg \
+            --out FC-Godesberg.apk \
+            FC_Godesberg-aligned.apk
+          echo "--- Signatur pruefen ---"
+          "$BUILD_TOOLS/apksigner" verify --verbose FC-Godesberg.apk
+
+      - name: Fertige APK anzeigen
+        run: ls -la FC-Godesberg.apk
+
+      - name: Signierte APK zum Download bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC-Godesberg-signiert
+          path: FC-Godesberg.apk
+          if-no-files-found: error
