@@ -73,6 +73,7 @@ const LOGO = "logo.png";
 const SHOP_BANNER = "banner.jpg";
 const ADMIN_NICK = "Oguzhan";
 const ADMIN_CODE = "Godesberg1919";
+const ACCESS_CODE = "FCG2026";
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 // === PUSH: Adresse deines Cloudflare-Workers ===
 const PUSH_WORKER_URL = "https://red-queen-358efcg-absage.benhakanbedburg.workers.dev/";
@@ -164,6 +165,8 @@ const DEFAULT_ANN = [
 function App() {
 const [fbReady, setFbReady] = useState(!!window.fb);
 const [showIntro, setShowIntro] = useState(true);
+const [hasAccess, setHasAccess] = useState(localStorage.getItem('fcg_access') === '1');
+const [accessInput, setAccessInput] = useState('');
 const [nickname, setNickname] = useState(localStorage.getItem('fcg_nick') || null);
 const [nickInput, setNickInput] = useState('');
 const [adminInput, setAdminInput] = useState('');
@@ -243,7 +246,17 @@ alert('Falscher Admin-Code!');
 setAdminInput('');
 }
 }
-function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); setNickname(null); setIsAdmin(false); setNickInput(''); setAdminInput(''); setShowAdminLogin(false); }
+function checkAccess() {
+if (accessInput.trim() === ACCESS_CODE) {
+localStorage.setItem('fcg_access', '1');
+setHasAccess(true);
+setAccessInput('');
+} else {
+alert('Falscher Zugangscode!');
+setAccessInput('');
+}
+}
+function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_access'); setNickname(null); setIsAdmin(false); setHasAccess(false); setNickInput(''); setAdminInput(''); setShowAdminLogin(false); }
 function sendMessage() {
 if (!newMsg.trim()) return;
 const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
@@ -305,6 +318,28 @@ function addForm(item) { window.fb.set('forms', [{ ...item, id: Date.now() }, ..
 function delForm(id) { window.fb.set('forms', forms.filter(f => f.id !== id)); }
 // Intro
 if (showIntro) return <Intro onDone={() => setShowIntro(false)} />;
+// Zugangscode-Sperre (interne App)
+if (!hasAccess) {
+return (
+<div className="min-h-screen bg-gradient-to-b from-red-900 via-slate-900 to-black flex items-center justify-center p-4">
+<div className="text-center max-w-sm w-full">
+<img src={LOGO} className="w-32 h-32 mx-auto mb-4 drop-shadow-2xl" />
+<h1 className="text-2xl font-black text-white mb-1">1. FC Godesberg</h1>
+<p className="text-red-200 mb-6 text-sm">Interne Vereins-App</p>
+<div className="bg-slate-800 p-6 rounded-2xl border border-red-700/50">
+<p className="text-3xl mb-3">🔒</p>
+<p className="text-white font-semibold mb-1">Zugang nur für Trainer & Vorstand</p>
+<p className="text-slate-400 text-xs mb-4">Bitte gib den Vereins-Zugangscode ein.</p>
+<input type="password" value={accessInput} onChange={e => setAccessInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && checkAccess()}
+placeholder="Zugangscode..." autoComplete="off"
+className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
+<button onClick={checkAccess} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Zugang freischalten</button>
+</div>
+<p className="text-slate-500 text-xs mt-4">Den Code erhältst du vom Vorstand.</p>
+</div>
+</div>
+);
+}
 // Verbindung wird aufgebaut
 if (!fbReady) {
 return (
