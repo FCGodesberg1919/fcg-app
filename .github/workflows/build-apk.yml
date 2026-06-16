@@ -46,28 +46,19 @@ jobs:
 
       - name: Android-Projekt aus twa-manifest erzeugen
         run: |
-          # update generiert das Android-Projekt aus der vorhandenen twa-manifest.json
           bubblewrap update --skipVersionUpgrade 2>&1 | tee update.log || echo "update fertig"
-          echo "--- Dateien nach update ---"
-          ls -la
 
       - name: Gradle-Build (erzeugt unsignierte APK)
         run: |
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleRelease --no-daemon 2>&1 | tail -30
-          else
-            echo "Kein gradlew vorhanden, Inhalt:"
-            ls -la
-            exit 1
-          fi
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon 2>&1 | tail -30
 
-      - name: APK suchen + signieren
+      - name: APK signieren
         run: |
           BT="$ANDROID_SDK_ROOT/build-tools/34.0.0"
-          APK=$(find . -name "*-release-unsigned.apk" -o -name "*-release.apk" 2>/dev/null | grep -v signed | head -1)
-          echo "Gefundene APK: $APK"
-          if [ -z "$APK" ]; then echo "FEHLER: keine APK"; find . -name "*.apk"; exit 1; fi
+          APK="./app/build/outputs/apk/release/app-release-unsigned.apk"
+          echo "Nutze APK: $APK"
+          ls -la "$APK"
           "$BT/zipalign" -v -p 4 "$APK" aligned.apk
           "$BT/apksigner" sign --ks "$GITHUB_WORKSPACE/android.keystore" \
             --ks-key-alias fcg --ks-pass pass:fcgodesberg --key-pass pass:fcgodesberg \
