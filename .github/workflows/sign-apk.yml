@@ -24,6 +24,14 @@ jobs:
           sdkmanager "build-tools;34.0.0"
           echo "BUILD_TOOLS=$ANDROID_SDK_ROOT/build-tools/34.0.0" >> $GITHUB_ENV
 
+      - name: APK aus Base64-Text wiederherstellen
+        run: |
+          base64 -d apk-base64.txt > FC_Godesberg-unsigned.apk
+          echo "--- Wiederhergestellte APK pruefen ---"
+          ls -la FC_Godesberg-unsigned.apk
+          file FC_Godesberg-unsigned.apk
+          unzip -t FC_Godesberg-unsigned.apk > /dev/null && echo "ZIP-Struktur OK" || echo "ZIP-Struktur FEHLERHAFT"
+
       - name: Signierungs-Schluessel erstellen
         run: |
           keytool -genkeypair \
@@ -33,7 +41,6 @@ jobs:
             -keystore "$GITHUB_WORKSPACE/fcg.keystore" \
             -storepass fcgodesberg \
             -keyalg RSA -keysize 2048 -validity 10000
-          echo "Schluessel erstellt."
 
       - name: APK optimieren (zipalign)
         run: |
