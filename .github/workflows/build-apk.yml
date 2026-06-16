@@ -1,0 +1,63 @@
+name: APK bauen
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Java einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Bubblewrap installieren
+        run: npm install -g @bubblewrap/cli
+
+      - name: Signierungs-Schluessel erstellen
+        run: |
+          keytool -genkeypair \
+            -dname "CN=FC Godesberg, OU=Verein, O=FC Godesberg, L=Bonn, ST=NRW, C=DE" \
+            -alias fcg \
+            -keypass fcgodesberg \
+            -keystore android.keystore \
+            -storepass fcgodesberg \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+
+      - name: APK bauen
+        run: |
+          bubblewrap build \
+            --skipPwaValidation \
+            --skipSigning=false << 'EOF'
+          fcgodesberg
+          fcgodesberg
+          EOF
+
+      - name: APK umbenennen
+        run: |
+          for f in *.apk; do
+            cp "$f" "FC-Godesberg-$f" 2>/dev/null || true
+          done
+          ls -la *.apk || echo "Keine APK gefunden"
+
+      - name: APK als Download bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC-Godesberg-APK
+          path: '*.apk'
+          if-no-files-found: warn
