@@ -215,6 +215,26 @@ setCancellations(filtered.sort((a, b) => b.created - a.created));
 return () => unsubs.forEach(u => u && u());
 }, [fbReady]);
 useEffect(() => { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+// Laufende Prüfung: Ist der eingeloggte Trainer/Vorstand noch gültig?
+// Wenn sein Zugang gelöscht oder Name/Passwort geändert wurde -> automatisch ausloggen.
+useEffect(() => {
+if (!nickname) return;
+if (localStorage.getItem('fcg_admin') === '1') return; // Admin bleibt immer
+const tid = localStorage.getItem('fcg_tid');
+const savedPw = localStorage.getItem('fcg_pw');
+const savedNick = (localStorage.getItem('fcg_nick') || '').toLowerCase();
+// Wenn kein Trainer-Login gespeichert ist, nichts tun
+if (!tid && !savedPw) return;
+// Passenden Zugang suchen: gleiche ID ODER gleicher Name, und Passwort muss noch stimmen
+const gueltig = trainers.find(t =>
+(String(t.id) === tid || t.name.toLowerCase() === savedNick) && t.pw === savedPw
+);
+if (!gueltig) {
+// Zugang gelöscht oder Passwort/Name geändert -> rauswerfen
+alert('Dein Zugang wurde geändert oder entfernt. Bitte melde dich mit deinen neuen Daten an.');
+logout();
+}
+}, [trainers, nickname]);
 function login() {
 const name = loginName.trim();
 const pw = loginPw.trim();
@@ -241,6 +261,8 @@ localStorage.setItem('fcg_nick', match.name);
 localStorage.removeItem('fcg_admin');
 if (vorstand) localStorage.setItem('fcg_vorstand', '1'); else localStorage.removeItem('fcg_vorstand');
 localStorage.setItem('fcg_team', match.team);
+localStorage.setItem('fcg_tid', String(match.id)); // Zugang-ID merken
+localStorage.setItem('fcg_pw', match.pw); // Passwort merken (für Gültigkeitsprüfung)
 setIsAdmin(false); setIsVorstand(vorstand);
 setNickname(match.name);
 setPage('home'); setLoginName(''); setLoginPw('');
@@ -252,7 +274,7 @@ return;
 alert('Falscher Name oder falsches Passwort. Bitte wende dich an den Admin.');
 setLoginPw('');
 }
-function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_vorstand'); localStorage.removeItem('fcg_team'); setNickname(null); setIsAdmin(false); setIsVorstand(false); setLoginName(''); setLoginPw(''); }
+function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_vorstand'); localStorage.removeItem('fcg_team'); localStorage.removeItem('fcg_tid'); localStorage.removeItem('fcg_pw'); setNickname(null); setIsAdmin(false); setIsVorstand(false); setLoginName(''); setLoginPw(''); }
 function sendMessage() {
 if (!newMsg.trim()) return;
 const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
