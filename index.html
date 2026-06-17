@@ -259,7 +259,7 @@ const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Dat
 window.fb.set('messages', [...messages, msg].slice(-100));
 setNewMsg('');
 }
-function removeMember(nick) { if (isAdmin) window.fb.set('members', members.filter(m => m.nickname !== nick)); }
+function removeMember(nick) { window.fb.set('members', members.filter(m => (m.nickname || '').toLowerCase() !== (nick || '').toLowerCase())); }
 function addCancellation(classN, team, time, date) {
 const c = { id: Date.now(), classN, team, time, date, nickname, created: Date.now() };
 window.fb.set('cancellations', [c, ...cancellations]);
@@ -922,7 +922,7 @@ return (
 <div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700">
 {members.length === 0 && <p className="text-slate-500 p-6 text-center">Noch keine Mitglieder</p>}
 {members.map((m, i) => (
-<div key={i} className="flex items-center justify-between p-4">
+<div key={m.nickname + '_' + i} className="flex items-center justify-between p-4">
 <div className="flex items-center gap-3">
 <div className="w-10 h-10 bg-red-700 rounded-full flex items-center justify-center text-white font-bold">{m.nickname.charAt(0).toUpperCase()}</div>
 <div><p className="text-white font-semibold">{m.nickname}{m.nickname.toLowerCase() === ADMIN_NICK.toLowerCase() ? ' 👑' : ''}</p><p className="text-slate-400 text-xs">Beigetreten: {m.joined}</p></div>
@@ -950,11 +950,10 @@ return (
 <div className="bg-green-900/30 border border-green-600 text-green-200 p-4 rounded-lg"><p className="font-semibold">{isAdmin ? '👑 Willkommen, Admin!' : '🆘 Willkommen, Vorstand!'}</p><p className="text-sm mt-1">Du kannst Ankündigungen, Platzbelegung und Formulare verwalten{isAdmin ? ' sowie Trainer-Zugänge erstellen' : ''}.</p></div>
 <div className="grid md:grid-cols-2 gap-6">
 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-<h3 className="text-white text-xl font-bold mb-4">Admin-Kontakt</h3>
+<h3 className="text-white text-xl font-bold mb-4">Admin</h3>
 <div className="space-y-3 text-sm">
 <div><p className="text-slate-400">Name:</p><p className="text-white font-semibold">Oguzhan Pekistiren</p></div>
-<div><p className="text-slate-400">Email:</p><a href="mailto:oguzhanpekistiren@gmail.com" className="text-red-400 break-all">oguzhanpekistiren@gmail.com</a></div>
-<div><p className="text-slate-400">Telefon:</p><a href="tel:015222758894" className="text-red-400">015222758894</a></div>
+<div><p className="text-slate-400">Rolle:</p><p className="text-white">IT-Verwaltung der Vereins-App</p></div>
 </div>
 </div>
 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
