@@ -183,6 +183,7 @@ const [platzImg, setPlatzImg] = useState(null);
 const [forms, setForms] = useState([]);
 const [events, setEvents] = useState(DEFAULT_EVENTS);
 const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
+const [trainers, setTrainers] = useState([]);
 const [newMsg, setNewMsg] = useState('');
 const chatEnd = useRef(null);
 useEffect(() => {
@@ -203,6 +204,7 @@ unsubs.push(window.fb.listen('events', v => setEvents(v || DEFAULT_EVENTS)));
 unsubs.push(window.fb.listen('announcements', v => setAnnouncements(v || DEFAULT_ANN)));
 unsubs.push(window.fb.listen('platzImg', v => setPlatzImg(v || null)));
 unsubs.push(window.fb.listen('forms', v => setForms(v || [])));
+unsubs.push(window.fb.listen('trainers', v => setTrainers(v || [])));
 unsubs.push(window.fb.listen('cancellations', v => {
 let list = v || [];
 const now = Date.now();
@@ -269,6 +271,28 @@ const c = { id: Date.now(), classN, team, time, date, nickname, created: Date.no
 window.fb.set('cancellations', [c, ...cancellations]);
 // Push an alle senden
 sendePush(team, time, date, classN, nickname);
+}
+// Zufälliges Passwort erzeugen (6 Zeichen, gut lesbar)
+function genPassword() {
+const zeichen = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let pw = '';
+for (let i = 0; i < 6; i++) pw += zeichen[Math.floor(Math.random() * zeichen.length)];
+return pw;
+}
+// Trainer-Zugang hinzufügen (Name + Mannschaft, Passwort wird erzeugt)
+function addTrainer(name, team) {
+const t = { id: Date.now(), name: name.trim(), team, pw: genPassword() };
+window.fb.set('trainers', [...trainers, t]);
+}
+function delTrainer(id) { window.fb.set('trainers', trainers.filter(t => t.id !== id)); }
+// Prüfen ob Name+Passwort für eine Mannschaft (oder Vorstand=ALLE) gültig ist
+function checkTrainerAuth(name, pw, teamKey) {
+const n = (name || '').trim().toLowerCase();
+const p = (pw || '').trim();
+const match = trainers.find(t => t.name.toLowerCase() === n && t.pw === p);
+if (!match) return false;
+if (match.team === 'ALLE') return true; // Vorstand-Notfallzugang
+return match.team === teamKey;
 }
 function delCancellation(id) { window.fb.set('cancellations', cancellations.filter(c => c.id !== id)); }
 function addUnit(classId, team, time, day) {
@@ -422,13 +446,13 @@ return (
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
 {page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
-{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, addCancellation }} />}
+{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, addCancellation, checkTrainerAuth }} />}
 {page === 'platz' && <PlatzPage {...{ platzImg, isAdmin, uploadPlatz, removePlatz }} />}
 {page === 'forms' && <FormsPage {...{ forms, isAdmin, addForm, delForm }} />}
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
 {page === 'members' && <MembersPage {...{ members, isAdmin, removeMember }} />}
-{page === 'admin' && <AdminPage {...{ isAdmin, nickname, members, cancellations, setPage }} />}
+{page === 'admin' && <AdminPage {...{ isAdmin, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
 </main>
 </div>
 <footer className="bg-slate-900 text-slate-500 text-center py-4 border-t border-slate-800 mt-8 text-sm">1. FC Godesberg</footer>
@@ -582,7 +606,7 @@ return (
 </div>
 );
 }
-function ClassesPage({ teams, setTeamInfo, isAdmin, addCancellation }) {
+function ClassesPage({ teams, setTeamInfo, isAdmin, addCancellation, checkTrainerAuth }) {
 const [letter, setLetter] = useState(null);
 const [num, setNum] = useState(null);
 const selKey = (letter && num) ? teamKey(letter, num) : null;
@@ -617,7 +641,7 @@ return (
 </div>
 {/* Auswahl-Anzeige + Absage */}
 {selKey && (
-<TeamPanel teamKey={selKey} label={teamLabel(letter, num)} info={info} isAdmin={isAdmin} onCancel={addCancellation} onSaveInfo={setTeamInfo} />
+<TeamPanel teamKey={selKey} label={teamLabel(letter, num)} info={info} isAdmin={isAdmin} onCancel={addCancellation} onSaveInfo={setTeamInfo} checkAuth={checkTrainerAuth} />
 )}
 {!selKey && (
 <div className="bg-slate-800/50 rounded-xl border border-slate-700 border-dashed p-6 text-center text-slate-500">
@@ -627,15 +651,36 @@ Bitte links einen Jahrgang und rechts eine Nummer wählen.
 </div>
 );
 }
-function TeamPanel({ teamKey, label, info, isAdmin, onCancel, onSaveInfo }) {
+function TeamPanel({ teamKey, label, info, isAdmin, onCancel, onSaveInfo, checkAuth }) {
 const [edit, setEdit] = useState(false);
+const [pendingDate, setPendingDate] = useState(null); // Datum, das abgesagt werden soll
+const [authName, setAuthName] = useState('');
+const [authPw, setAuthPw] = useState('');
 const termine = info ? naechsteTermine(info.day, 3) : [];
 const dayLabel = (info && info.day !== undefined && info.day !== null && info.day !== '') ? WEEKDAYS[Number(info.day)] : null;
-const absagen = (d) => {
+
+const sendeAbsage = (d) => {
 const datumStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 onCancel('', label, info ? info.time : '', datumStr);
 alert('Absage gesendet! Alle Mitglieder bekommen jetzt eine Benachrichtigung. 🔔');
 };
+
+const klickDatum = (d) => {
+if (isAdmin) { sendeAbsage(d); return; } // Admin braucht kein Passwort
+setPendingDate(d); // sonst: Passwort-Abfrage öffnen
+setAuthName(''); setAuthPw('');
+};
+
+const bestaetigeAbsage = () => {
+if (!authName.trim() || !authPw.trim()) { alert('Bitte Namen und Passwort eingeben.'); return; }
+if (!checkAuth(authName, authPw, label)) {
+alert('Falscher Name oder falsches Passwort für diese Mannschaft. Absage nicht möglich.');
+return;
+}
+sendeAbsage(pendingDate);
+setPendingDate(null); setAuthName(''); setAuthPw('');
+};
+
 return (
 <div className="bg-slate-800 rounded-xl border border-red-700/50 p-4">
 <div className="flex items-center justify-between mb-3">
@@ -648,13 +693,25 @@ return (
 {edit && isAdmin && (
 <TeamEditForm teamKey={teamKey} info={info} onSave={(i) => { onSaveInfo(teamKey, i); setEdit(false); }} onDelete={() => { onSaveInfo(teamKey, null); setEdit(false); }} onCancel={() => setEdit(false)} />
 )}
-{!edit && (
+{!edit && pendingDate && (
+<div className="mb-3 bg-slate-900 p-3 rounded-lg border border-red-600 space-y-2">
+<p className="text-red-300 text-sm font-semibold">🔒 Absage für {label} am {pendingDate.toLocaleDateString('de-DE')}</p>
+<p className="text-slate-400 text-xs">Bitte mit deinem Trainer-Zugang bestätigen:</p>
+<input placeholder="Name" value={authName} onChange={e => setAuthName(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<input type="password" placeholder="Passwort" value={authPw} onChange={e => setAuthPw(e.target.value)} onKeyPress={e => e.key === 'Enter' && bestaetigeAbsage()} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<div className="flex gap-2">
+<button onClick={bestaetigeAbsage} className="flex-1 bg-red-700 hover:bg-red-600 text-white py-2 rounded text-sm font-semibold">Absage bestätigen</button>
+<button onClick={() => setPendingDate(null)} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button>
+</div>
+</div>
+)}
+{!edit && !pendingDate && (
 info && termine.length > 0 ? (
 <div>
 <p className="text-slate-300 text-sm mb-2">Welcher Termin fällt aus? (Tippen zum Absagen)</p>
 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
 {termine.map((d, i) => (
-<button key={i} onClick={() => absagen(d)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
+<button key={i} onClick={() => klickDatum(d)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
 {formatDatum(d)}
 </button>
 ))}
@@ -904,7 +961,7 @@ return (
 </div>
 );
 }
-function AdminPage({ isAdmin, nickname, members, cancellations, setPage }) {
+function AdminPage({ isAdmin, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
 if (!isAdmin) return (
 <div className="space-y-6">
 <h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
@@ -934,6 +991,55 @@ return (
 <button onClick={() => setPage('cancellations')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg">Absagen ({cancellations.length})</button>
 </div>
 </div>
+<TrainerVerwaltung trainers={trainers} addTrainer={addTrainer} delTrainer={delTrainer} />
+</div>
+);
+}
+// Verwaltung der Trainer-Zugänge (Name + Mannschaft + automatisches Passwort)
+function TrainerVerwaltung({ trainers, addTrainer, delTrainer }) {
+const [name, setName] = useState('');
+const [team, setTeam] = useState('');
+// Alle möglichen Mannschaften aus Buchstaben + Nummern erzeugen
+const alleTeams = [];
+for (const l of LETTERS) for (const n of NUMBERS) alleTeams.push(teamLabel(l, n));
+
+const erstellen = () => {
+if (!name.trim()) { alert('Bitte einen Namen eingeben.'); return; }
+if (!team) { alert('Bitte eine Mannschaft wählen.'); return; }
+addTrainer(name, team);
+setName(''); setTeam('');
+};
+
+return (
+<div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+<h3 className="text-white text-xl font-bold mb-2">🔑 Trainer-Zugänge</h3>
+<p className="text-slate-400 text-sm mb-4">Lege fest, wer welche Mannschaft absagen darf. Das Passwort wird automatisch erzeugt. Gib Name + Passwort an den Trainer weiter.</p>
+
+<div className="bg-slate-900 p-4 rounded-lg border border-slate-700 mb-4 space-y-2">
+<input placeholder="Name (z.B. Markus)" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<select value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm">
+<option value="">— Mannschaft wählen —</option>
+<option value="ALLE">🆘 Vorstand (darf ALLE absagen)</option>
+{alleTeams.map(t => <option key={t} value={t}>{t}</option>)}
+</select>
+<button onClick={erstellen} className="w-full bg-green-700 hover:bg-green-600 text-white py-2 rounded text-sm font-semibold">+ Zugang erstellen (Passwort wird erzeugt)</button>
+</div>
+
+{trainers.length === 0 ? (
+<p className="text-slate-500 text-sm">Noch keine Trainer-Zugänge angelegt.</p>
+) : (
+<div className="space-y-2">
+{trainers.map(t => (
+<div key={t.id} className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700">
+<div className="text-sm">
+<p className="text-white font-semibold">{t.name} <span className="text-slate-400 font-normal">· {t.team === 'ALLE' ? '🆘 Vorstand (alle)' : t.team}</span></p>
+<p className="text-slate-300">Passwort: <span className="font-mono bg-slate-700 px-2 py-0.5 rounded text-yellow-300">{t.pw}</span></p>
+</div>
+<button onClick={() => { if (confirm('Zugang von ' + t.name + ' wirklich löschen?')) delTrainer(t.id); }} className="text-red-400 hover:text-red-300 text-sm bg-slate-700 px-3 py-1.5 rounded">🗑️</button>
+</div>
+))}
+</div>
+)}
 </div>
 );
 }
