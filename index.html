@@ -180,6 +180,7 @@ const [classes, setClasses] = useState(DEFAULT_CLASSES);
 const [teams, setTeams] = useState(DEFAULT_TEAMS);
 const [cancellations, setCancellations] = useState([]);
 const [platzImg, setPlatzImg] = useState(null);
+const [platzTyp, setPlatzTyp] = useState('bild');
 const [forms, setForms] = useState([]);
 const [events, setEvents] = useState(DEFAULT_EVENTS);
 const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
@@ -203,6 +204,7 @@ unsubs.push(window.fb.listen('teams', v => setTeams(v || DEFAULT_TEAMS)));
 unsubs.push(window.fb.listen('events', v => setEvents(v || DEFAULT_EVENTS)));
 unsubs.push(window.fb.listen('announcements', v => setAnnouncements(v || DEFAULT_ANN)));
 unsubs.push(window.fb.listen('platzImg', v => setPlatzImg(v || null)));
+unsubs.push(window.fb.listen('platzTyp', v => setPlatzTyp(v || 'bild')));
 unsubs.push(window.fb.listen('forms', v => setForms(v || [])));
 unsubs.push(window.fb.listen('trainers', v => setTrainers(v || [])));
 unsubs.push(window.fb.listen('cancellations', v => {
@@ -322,6 +324,22 @@ sendePushAnn(item.title, item.desc);
 function delAnn(id) { window.fb.set('announcements', announcements.filter(a => a.id !== id)); }
 function uploadPlatz(file) {
 if (!file) return;
+const istPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+if (istPdf) {
+// PDF direkt als Daten-URL speichern (max ~700KB wegen Firestore)
+if (file.size > 900 * 1024) {
+alert('Die PDF ist zu groß (max. ca. 700 KB). Bitte eine kleinere PDF verwenden oder als Bild hochladen.');
+return;
+}
+const reader = new FileReader();
+reader.onload = (e) => {
+window.fb.set('platzImg', e.target.result);
+window.fb.set('platzTyp', 'pdf');
+};
+reader.readAsDataURL(file);
+return;
+}
+// sonst: Bild (wird verkleinert)
 const reader = new FileReader();
 reader.onload = (e) => {
 const img = new Image();
@@ -332,12 +350,13 @@ if (w > maxDim || h > maxDim) { if (w > h) { h = Math.round(h * maxDim / w); w =
 canvas.width = w; canvas.height = h;
 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
 window.fb.set('platzImg', canvas.toDataURL('image/jpeg', 0.8));
+window.fb.set('platzTyp', 'bild');
 };
 img.src = e.target.result;
 };
 reader.readAsDataURL(file);
 }
-function removePlatz() { window.fb.del('platzImg'); }
+function removePlatz() { window.fb.del('platzImg'); window.fb.del('platzTyp'); }
 function addForm(item) { window.fb.set('forms', [{ ...item, id: Date.now() }, ...forms]); }
 function delForm(id) { window.fb.set('forms', forms.filter(f => f.id !== id)); }
 // Intro
@@ -447,7 +466,7 @@ return (
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
 {page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
 {page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, addCancellation, checkTrainerAuth }} />}
-{page === 'platz' && <PlatzPage {...{ platzImg, isAdmin, uploadPlatz, removePlatz }} />}
+{page === 'platz' && <PlatzPage {...{ platzImg, platzTyp, isAdmin, uploadPlatz, removePlatz }} />}
 {page === 'forms' && <FormsPage {...{ forms, isAdmin, addForm, delForm }} />}
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
@@ -744,15 +763,30 @@ return (
 </div>
 );
 }
-function PlatzPage({ platzImg, isAdmin, uploadPlatz, removePlatz }) {
+function PlatzPage({ platzImg, platzTyp, isAdmin, uploadPlatz, removePlatz }) {
+const istPdf = platzTyp === 'pdf';
 return (
 <div className="space-y-4">
 <h2 className="text-2xl font-bold text-white">📋 Platzbelegung</h2>
 {platzImg ? (
 <div className="space-y-3">
+{istPdf ? (
+<div className="space-y-3">
+<div className="bg-slate-800 rounded-xl border border-slate-700 p-2">
+<iframe src={platzImg} className="w-full rounded-lg" style={{ height: '70vh', minHeight: '400px' }} title="Platzbelegung PDF"></iframe>
+</div>
+<div className="flex flex-wrap gap-2">
+<a href={platzImg} download="platzbelegung.pdf" className="inline-block bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">↓ PDF herunterladen</a>
+<a href={platzImg} target="_blank" rel="noopener" className="inline-block bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">↗ In neuem Tab öffnen</a>
+</div>
+</div>
+) : (
+<div className="space-y-3">
 <div className="bg-slate-800 rounded-xl border border-slate-700 p-3"><img src={platzImg} className="w-full rounded-lg" /></div>
 <a href={platzImg} download="platzbelegung.jpg" className="inline-block text-red-400 text-sm">↗ Bild herunterladen</a>
-{isAdmin && <button onClick={removePlatz} className="block bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">🗑️ Bild entfernen</button>}
+</div>
+)}
+{isAdmin && <button onClick={removePlatz} className="block bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">🗑️ Platzbelegung entfernen</button>}
 </div>
 ) : (
 <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
@@ -762,9 +796,9 @@ return (
 )}
 {isAdmin && (
 <div className="bg-slate-800 rounded-xl border border-green-700 p-4">
-<p className="text-white font-semibold mb-2">{platzImg ? 'Anderes Bild hochladen' : 'Platzbelegung hochladen'}</p>
-<label className="inline-block bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold cursor-pointer">+ Bild auswählen (JPG/PNG)<input type="file" accept="image/*" className="hidden" onChange={e => uploadPlatz(e.target.files[0])} /></label>
-<p className="text-slate-500 text-xs mt-2">Foto vom Aushang reicht! Wird automatisch verkleinert.</p>
+<p className="text-white font-semibold mb-2">{platzImg ? 'Neue Platzbelegung hochladen' : 'Platzbelegung hochladen'}</p>
+<label className="inline-block bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold cursor-pointer">+ Datei auswählen (Bild oder PDF)<input type="file" accept="image/*,application/pdf,.pdf" className="hidden" onChange={e => uploadPlatz(e.target.files[0])} /></label>
+<p className="text-slate-500 text-xs mt-2">Foto vom Aushang (wird verkleinert) oder PDF (max. ca. 700 KB).</p>
 </div>
 )}
 </div>
