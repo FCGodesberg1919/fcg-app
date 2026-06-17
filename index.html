@@ -72,8 +72,7 @@ const { useState, useEffect, useRef } = React;
 const LOGO = "logo.png";
 const SHOP_BANNER = "banner.jpg";
 const ADMIN_NICK = "Oguzhan";
-const ADMIN_CODE = "Godesberg1919";
-const ACCESS_CODE = "FCG2026";
+const ADMIN_CODE = "Godesberg1919007";
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 // === PUSH: Adresse deines Cloudflare-Workers ===
 const PUSH_WORKER_URL = "https://red-queen-358efcg-absage.benhakanbedburg.workers.dev/";
@@ -165,13 +164,12 @@ const DEFAULT_ANN = [
 function App() {
 const [fbReady, setFbReady] = useState(!!window.fb);
 const [showIntro, setShowIntro] = useState(true);
-const [hasAccess, setHasAccess] = useState(localStorage.getItem('fcg_access') === '1');
-const [accessInput, setAccessInput] = useState('');
 const [nickname, setNickname] = useState(localStorage.getItem('fcg_nick') || null);
-const [nickInput, setNickInput] = useState('');
-const [adminInput, setAdminInput] = useState('');
-const [showAdminLogin, setShowAdminLogin] = useState(false);
 const [isAdmin, setIsAdmin] = useState(localStorage.getItem('fcg_admin') === '1');
+const [isVorstand, setIsVorstand] = useState(localStorage.getItem('fcg_vorstand') === '1');
+const [loginName, setLoginName] = useState('');
+const [loginPw, setLoginPw] = useState('');
+const myTeam = localStorage.getItem('fcg_team') || null; // Mannschaft des eingeloggten Trainers
 const [page, setPage] = useState('home');
 const [menuOpen, setMenuOpen] = useState(false);
 const [messages, setMessages] = useState([]);
@@ -217,50 +215,44 @@ setCancellations(filtered.sort((a, b) => b.created - a.created));
 return () => unsubs.forEach(u => u && u());
 }, [fbReady]);
 useEffect(() => { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-function joinClub() {
-const nick = nickInput.trim();
-if (!nick) return;
-if (nick.toLowerCase() === ADMIN_NICK.toLowerCase()) {
-alert('Dieser Name ist reserviert. Bitte wähle einen anderen Namen.');
+function login() {
+const name = loginName.trim();
+const pw = loginPw.trim();
+if (!name || !pw) { alert('Bitte Name und Passwort eingeben.'); return; }
+
+// 1. Admin-Login (Master): Name egal, Hauptsache Admin-Passwort stimmt
+if (pw === ADMIN_CODE) {
+localStorage.setItem('fcg_admin', '1');
+localStorage.removeItem('fcg_vorstand');
+localStorage.setItem('fcg_nick', name);
+setIsAdmin(true); setIsVorstand(false);
+setNickname(name);
+setPage('home'); setLoginName(''); setLoginPw('');
+const exists = members.find(x => x.nickname.toLowerCase() === name.toLowerCase());
+if (!exists) window.fb.set('members', [...members, { nickname: name, joined: new Date().toLocaleDateString('de-DE') }]);
 return;
 }
-localStorage.setItem('fcg_nick', nick);
-setNickname(nick);
-setPage('home');
-const exists = members.find(x => x.nickname.toLowerCase() === nick.toLowerCase());
-if (!exists) {
-const m = [...members, { nickname: nick, joined: new Date().toLocaleDateString('de-DE') }];
-window.fb.set('members', m);
+
+// 2. Trainer/Vorstand-Login: Name + Passwort muss zu einem Zugang passen
+const match = trainers.find(t => t.name.toLowerCase() === name.toLowerCase() && t.pw === pw);
+if (match) {
+const vorstand = match.team === 'ALLE';
+localStorage.setItem('fcg_nick', match.name);
+localStorage.removeItem('fcg_admin');
+if (vorstand) localStorage.setItem('fcg_vorstand', '1'); else localStorage.removeItem('fcg_vorstand');
+localStorage.setItem('fcg_team', match.team);
+setIsAdmin(false); setIsVorstand(vorstand);
+setNickname(match.name);
+setPage('home'); setLoginName(''); setLoginPw('');
+const exists = members.find(x => x.nickname.toLowerCase() === match.name.toLowerCase());
+if (!exists) window.fb.set('members', [...members, { nickname: match.name, joined: new Date().toLocaleDateString('de-DE') }]);
+return;
 }
+
+alert('Falscher Name oder falsches Passwort. Bitte wende dich an den Admin.');
+setLoginPw('');
 }
-function adminLogin() {
-if (adminInput === ADMIN_CODE) {
-localStorage.setItem('fcg_admin', '1');
-localStorage.setItem('fcg_nick', ADMIN_NICK);
-setIsAdmin(true);
-setNickname(ADMIN_NICK);
-setPage('home');
-setAdminInput('');
-const exists = members.find(x => x.nickname.toLowerCase() === ADMIN_NICK.toLowerCase());
-if (!exists) {
-window.fb.set('members', [...members, { nickname: ADMIN_NICK, joined: new Date().toLocaleDateString('de-DE') }]);
-}
-} else {
-alert('Falscher Admin-Code!');
-setAdminInput('');
-}
-}
-function checkAccess() {
-if (accessInput.trim() === ACCESS_CODE) {
-localStorage.setItem('fcg_access', '1');
-setHasAccess(true);
-setAccessInput('');
-} else {
-alert('Falscher Zugangscode!');
-setAccessInput('');
-}
-}
-function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_access'); setNickname(null); setIsAdmin(false); setHasAccess(false); setNickInput(''); setAdminInput(''); setShowAdminLogin(false); }
+function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_vorstand'); localStorage.removeItem('fcg_team'); setNickname(null); setIsAdmin(false); setIsVorstand(false); setLoginName(''); setLoginPw(''); }
 function sendMessage() {
 if (!newMsg.trim()) return;
 const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
@@ -361,28 +353,6 @@ function addForm(item) { window.fb.set('forms', [{ ...item, id: Date.now() }, ..
 function delForm(id) { window.fb.set('forms', forms.filter(f => f.id !== id)); }
 // Intro
 if (showIntro) return <Intro onDone={() => setShowIntro(false)} />;
-// Zugangscode-Sperre (interne App)
-if (!hasAccess) {
-return (
-<div className="min-h-screen bg-gradient-to-b from-red-900 via-slate-900 to-black flex items-center justify-center p-4">
-<div className="text-center max-w-sm w-full">
-<img src={LOGO} className="w-32 h-32 mx-auto mb-4 drop-shadow-2xl" />
-<h1 className="text-2xl font-black text-white mb-1">1. FC Godesberg</h1>
-<p className="text-red-200 mb-6 text-sm">Interne Vereins-App</p>
-<div className="bg-slate-800 p-6 rounded-2xl border border-red-700/50">
-<p className="text-3xl mb-3">🔒</p>
-<p className="text-white font-semibold mb-1">Zugang nur für Trainer & Vorstand</p>
-<p className="text-slate-400 text-xs mb-4">Bitte gib den Vereins-Zugangscode ein.</p>
-<input type="password" value={accessInput} onChange={e => setAccessInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && checkAccess()}
-placeholder="Zugangscode..." autoComplete="off"
-className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
-<button onClick={checkAccess} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Zugang freischalten</button>
-</div>
-<p className="text-slate-500 text-xs mt-4">Den Code erhältst du vom Vorstand.</p>
-</div>
-</div>
-);
-}
 // Verbindung wird aufgebaut
 if (!fbReady) {
 return (
@@ -394,40 +364,32 @@ return (
 </div>
 );
 }
-// Nickname-Eingabe
+// Login mit Name + Passwort (Admin, Trainer oder Vorstand)
 if (!nickname) {
 return (
 <div className="min-h-screen bg-gradient-to-b from-red-900 via-slate-900 to-black flex items-center justify-center p-4">
 <div className="text-center max-w-sm w-full">
-<img src={LOGO} className="w-36 h-36 mx-auto mb-4 drop-shadow-2xl" />
-<h1 className="text-3xl font-black text-white mb-1">1. FC Godesberg</h1>
-<p className="text-red-200 mb-8 text-sm">Vereins-App</p>
-<div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-<p className="text-white font-semibold mb-3">Wie heißt du?</p>
-<input value={nickInput} onChange={e => setNickInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && joinClub()}
-placeholder="Dein Nickname..." maxLength={20}
-className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
-<button onClick={joinClub} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Beitreten</button>
+<img src={LOGO} className="w-32 h-32 mx-auto mb-4 drop-shadow-2xl" />
+<h1 className="text-2xl font-black text-white mb-1">1. FC Godesberg</h1>
+<p className="text-red-200 mb-6 text-sm">Interne Vereins-App</p>
+<div className="bg-slate-800 p-6 rounded-2xl border border-red-700/50">
+<p className="text-3xl mb-3">🔒</p>
+<p className="text-white font-semibold mb-1">Anmeldung</p>
+<p className="text-slate-400 text-xs mb-4">Mit deinem Namen und Passwort einloggen.</p>
+<input value={loginName} onChange={e => setLoginName(e.target.value)} onKeyPress={e => e.key === 'Enter' && login()}
+placeholder="Name" autoComplete="off"
+className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
+<input type="password" value={loginPw} onChange={e => setLoginPw(e.target.value)} onKeyPress={e => e.key === 'Enter' && login()}
+placeholder="Passwort" autoComplete="off"
+className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-center" />
+<button onClick={login} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold">Anmelden</button>
 </div>
-<div className="mt-4">
-{!showAdminLogin ? (
-<button onClick={() => setShowAdminLogin(true)} className="text-slate-500 text-xs hover:text-slate-300">🔒 Admin-Login</button>
-) : (
-<div className="bg-slate-800 p-4 rounded-xl border border-yellow-700/50">
-<p className="text-white text-sm font-semibold mb-2">🔒 Admin-Anmeldung</p>
-<input type="password" value={adminInput} onChange={e => setAdminInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && adminLogin()}
-placeholder="Admin-Code..." autoComplete="off"
-className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 text-center" />
-<button onClick={adminLogin} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg font-bold text-sm">Als Admin anmelden 👑</button>
-<button onClick={() => { setShowAdminLogin(false); setAdminInput(''); }} className="w-full text-slate-400 text-xs mt-2">Abbrechen</button>
-</div>
-)}
-</div>
-<p className="text-slate-500 text-xs mt-4">Kein Passwort nötig – einfach Nickname wählen</p>
+<p className="text-slate-500 text-xs mt-4">Zugang erhältst du vom Admin / Vorstand.</p>
 </div>
 </div>
 );
 }
+const canEdit = isAdmin || isVorstand;
 const nav = [
 { id: 'home', label: '🏠 Home' },
 { id: 'classes', label: '⚽ Training & Absagen' },
@@ -446,7 +408,7 @@ return (
 <img src={LOGO} className="w-11 h-11" />
 <div>
 <h1 className="font-bold">1. FC Godesberg</h1>
-<p className="text-red-100 text-xs">Hi, {nickname}{isAdmin ? ' 👑' : ''}</p>
+<p className="text-red-100 text-xs">Hi, {nickname}{isAdmin ? ' 👑' : (isVorstand ? ' 🆘' : '')}</p>
 </div>
 </div>
 <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden text-2xl">{menuOpen ? '✕' : '☰'}</button>
@@ -464,14 +426,14 @@ return (
 <button onClick={logout} className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-700 mt-auto">🚪 Abmelden</button>
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
-{page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }} />}
-{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, addCancellation, checkTrainerAuth }} />}
-{page === 'platz' && <PlatzPage {...{ platzImg, platzTyp, isAdmin, uploadPlatz, removePlatz }} />}
-{page === 'forms' && <FormsPage {...{ forms, isAdmin, addForm, delForm }} />}
-{page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin, nickname, delCancellation }} />}
+{page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin: canEdit, delAnn, addAnn, events, delEvent, addEvent }} />}
+{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeam }} />}
+{page === 'platz' && <PlatzPage {...{ platzImg, platzTyp, isAdmin: canEdit, uploadPlatz, removePlatz }} />}
+{page === 'forms' && <FormsPage {...{ forms, isAdmin: canEdit, addForm, delForm }} />}
+{page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin: canEdit, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd }} />}
-{page === 'members' && <MembersPage {...{ members, isAdmin, removeMember }} />}
-{page === 'admin' && <AdminPage {...{ isAdmin, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
+{page === 'members' && <MembersPage {...{ members, isAdmin: canEdit, removeMember }} />}
+{page === 'admin' && <AdminPage {...{ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
 </main>
 </div>
 <footer className="bg-slate-900 text-slate-500 text-center py-4 border-t border-slate-800 mt-8 text-sm">1. FC Godesberg</footer>
@@ -625,11 +587,14 @@ return (
 </div>
 );
 }
-function ClassesPage({ teams, setTeamInfo, isAdmin, addCancellation, checkTrainerAuth }) {
+function ClassesPage({ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeam }) {
 const [letter, setLetter] = useState(null);
 const [num, setNum] = useState(null);
 const selKey = (letter && num) ? teamKey(letter, num) : null;
 const info = selKey ? teams[selKey] : null;
+const selLabel = (letter && num) ? teamLabel(letter, num) : null;
+// Darf der eingeloggte Nutzer dieses Team absagen?
+const darfAbsagen = isAdmin || isVorstand || (myTeam && selLabel && myTeam === selLabel);
 return (
 <div className="space-y-4">
 <h2 className="text-2xl font-bold text-white">⚽ Training & Absagen</h2>
@@ -660,7 +625,7 @@ return (
 </div>
 {/* Auswahl-Anzeige + Absage */}
 {selKey && (
-<TeamPanel teamKey={selKey} label={teamLabel(letter, num)} info={info} isAdmin={isAdmin} onCancel={addCancellation} onSaveInfo={setTeamInfo} checkAuth={checkTrainerAuth} />
+<TeamPanel teamKey={selKey} label={teamLabel(letter, num)} info={info} isAdmin={isAdmin || isVorstand} onCancel={addCancellation} onSaveInfo={setTeamInfo} darfAbsagen={darfAbsagen} />
 )}
 {!selKey && (
 <div className="bg-slate-800/50 rounded-xl border border-slate-700 border-dashed p-6 text-center text-slate-500">
@@ -670,11 +635,8 @@ Bitte links einen Jahrgang und rechts eine Nummer wählen.
 </div>
 );
 }
-function TeamPanel({ teamKey, label, info, isAdmin, onCancel, onSaveInfo, checkAuth }) {
+function TeamPanel({ teamKey, label, info, isAdmin, onCancel, onSaveInfo, darfAbsagen }) {
 const [edit, setEdit] = useState(false);
-const [pendingDate, setPendingDate] = useState(null); // Datum, das abgesagt werden soll
-const [authName, setAuthName] = useState('');
-const [authPw, setAuthPw] = useState('');
 const termine = info ? naechsteTermine(info.day, 3) : [];
 const dayLabel = (info && info.day !== undefined && info.day !== null && info.day !== '') ? WEEKDAYS[Number(info.day)] : null;
 
@@ -682,22 +644,6 @@ const sendeAbsage = (d) => {
 const datumStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 onCancel('', label, info ? info.time : '', datumStr);
 alert('Absage gesendet! Alle Mitglieder bekommen jetzt eine Benachrichtigung. 🔔');
-};
-
-const klickDatum = (d) => {
-if (isAdmin) { sendeAbsage(d); return; } // Admin braucht kein Passwort
-setPendingDate(d); // sonst: Passwort-Abfrage öffnen
-setAuthName(''); setAuthPw('');
-};
-
-const bestaetigeAbsage = () => {
-if (!authName.trim() || !authPw.trim()) { alert('Bitte Namen und Passwort eingeben.'); return; }
-if (!checkAuth(authName, authPw, label)) {
-alert('Falscher Name oder falsches Passwort für diese Mannschaft. Absage nicht möglich.');
-return;
-}
-sendeAbsage(pendingDate);
-setPendingDate(null); setAuthName(''); setAuthPw('');
 };
 
 return (
@@ -712,25 +658,18 @@ return (
 {edit && isAdmin && (
 <TeamEditForm teamKey={teamKey} info={info} onSave={(i) => { onSaveInfo(teamKey, i); setEdit(false); }} onDelete={() => { onSaveInfo(teamKey, null); setEdit(false); }} onCancel={() => setEdit(false)} />
 )}
-{!edit && pendingDate && (
-<div className="mb-3 bg-slate-900 p-3 rounded-lg border border-red-600 space-y-2">
-<p className="text-red-300 text-sm font-semibold">🔒 Absage für {label} am {pendingDate.toLocaleDateString('de-DE')}</p>
-<p className="text-slate-400 text-xs">Bitte mit deinem Trainer-Zugang bestätigen:</p>
-<input placeholder="Name" value={authName} onChange={e => setAuthName(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
-<input type="password" placeholder="Passwort" value={authPw} onChange={e => setAuthPw(e.target.value)} onKeyPress={e => e.key === 'Enter' && bestaetigeAbsage()} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
-<div className="flex gap-2">
-<button onClick={bestaetigeAbsage} className="flex-1 bg-red-700 hover:bg-red-600 text-white py-2 rounded text-sm font-semibold">Absage bestätigen</button>
-<button onClick={() => setPendingDate(null)} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button>
-</div>
+{!edit && !darfAbsagen && (
+<div className="bg-slate-900 border border-slate-600 rounded-lg p-4 text-center">
+<p className="text-slate-400 text-sm">🔒 Du kannst nur die Trainingseinheiten deiner eigenen Mannschaft absagen.</p>
 </div>
 )}
-{!edit && !pendingDate && (
+{!edit && darfAbsagen && (
 info && termine.length > 0 ? (
 <div>
 <p className="text-slate-300 text-sm mb-2">Welcher Termin fällt aus? (Tippen zum Absagen)</p>
 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
 {termine.map((d, i) => (
-<button key={i} onClick={() => klickDatum(d)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
+<button key={i} onClick={() => sendeAbsage(d)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
 {formatDatum(d)}
 </button>
 ))}
@@ -995,20 +934,20 @@ return (
 </div>
 );
 }
-function AdminPage({ isAdmin, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
-if (!isAdmin) return (
+function AdminPage({ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
+if (!isAdmin && !isVorstand) return (
 <div className="space-y-6">
 <h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
 <div className="bg-yellow-900/30 border border-yellow-600 text-yellow-200 p-6 rounded-lg">
-<p className="font-semibold mb-2">🔒 Nur für Admins</p>
-<p className="text-sm">Nur der Admin (Nickname "{ADMIN_NICK}") sieht diesen Bereich. Du bist als "{nickname}" angemeldet.</p>
+<p className="font-semibold mb-2">🔒 Nur für Admin & Vorstand</p>
+<p className="text-sm">Dieser Bereich ist nur für Admin und Vorstand sichtbar. Du bist als "{nickname}" angemeldet.</p>
 </div>
 </div>
 );
 return (
 <div className="space-y-6">
-<h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
-<div className="bg-green-900/30 border border-green-600 text-green-200 p-4 rounded-lg"><p className="font-semibold">👑 Willkommen, Admin!</p><p className="text-sm mt-1">Unter "Training & Absagen" legst du Klassen & Einheiten an.</p></div>
+<h2 className="text-2xl font-bold text-white">⚙️ {isAdmin ? 'Admin' : 'Vorstand'}-Bereich</h2>
+<div className="bg-green-900/30 border border-green-600 text-green-200 p-4 rounded-lg"><p className="font-semibold">{isAdmin ? '👑 Willkommen, Admin!' : '🆘 Willkommen, Vorstand!'}</p><p className="text-sm mt-1">Du kannst Ankündigungen, Platzbelegung und Formulare verwalten{isAdmin ? ' sowie Trainer-Zugänge erstellen' : ''}.</p></div>
 <div className="grid md:grid-cols-2 gap-6">
 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
 <h3 className="text-white text-xl font-bold mb-4">Admin-Kontakt</h3>
@@ -1025,7 +964,7 @@ return (
 <button onClick={() => setPage('cancellations')} className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg">Absagen ({cancellations.length})</button>
 </div>
 </div>
-<TrainerVerwaltung trainers={trainers} addTrainer={addTrainer} delTrainer={delTrainer} />
+{isAdmin && <TrainerVerwaltung trainers={trainers} addTrainer={addTrainer} delTrainer={delTrainer} />}
 </div>
 );
 }
