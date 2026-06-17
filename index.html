@@ -183,6 +183,7 @@ const [forms, setForms] = useState([]);
 const [events, setEvents] = useState(DEFAULT_EVENTS);
 const [announcements, setAnnouncements] = useState(DEFAULT_ANN);
 const [trainers, setTrainers] = useState([]);
+const [trainersGeladen, setTrainersGeladen] = useState(false);
 const [newMsg, setNewMsg] = useState('');
 const chatEnd = useRef(null);
 useEffect(() => {
@@ -204,7 +205,7 @@ unsubs.push(window.fb.listen('announcements', v => setAnnouncements(v || DEFAULT
 unsubs.push(window.fb.listen('platzImg', v => setPlatzImg(v || null)));
 unsubs.push(window.fb.listen('platzTyp', v => setPlatzTyp(v || 'bild')));
 unsubs.push(window.fb.listen('forms', v => setForms(v || [])));
-unsubs.push(window.fb.listen('trainers', v => setTrainers(v || [])));
+unsubs.push(window.fb.listen('trainers', v => { setTrainers(v || []); setTrainersGeladen(true); }));
 unsubs.push(window.fb.listen('cancellations', v => {
 let list = v || [];
 const now = Date.now();
@@ -219,6 +220,7 @@ useEffect(() => { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior
 // Wenn sein Zugang gelöscht oder Name/Passwort geändert wurde -> automatisch ausloggen.
 useEffect(() => {
 if (!nickname) return;
+if (!trainersGeladen) return; // erst prüfen, wenn die Zugänge wirklich geladen sind
 if (localStorage.getItem('fcg_admin') === '1') return; // Admin bleibt immer
 const tid = localStorage.getItem('fcg_tid');
 const savedPw = localStorage.getItem('fcg_pw');
@@ -234,7 +236,7 @@ if (!gueltig) {
 alert('Dein Zugang wurde geändert oder entfernt. Bitte melde dich mit deinen neuen Daten an.');
 logout();
 }
-}, [trainers, nickname]);
+}, [trainers, nickname, trainersGeladen]);
 function login() {
 const name = loginName.trim();
 const pw = loginPw.trim();
