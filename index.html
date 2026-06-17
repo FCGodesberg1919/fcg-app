@@ -27,6 +27,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
 <style>body{background:#0f172a;} ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px;}</style>
 </head>
 <body>
@@ -344,17 +346,54 @@ function uploadPlatz(file) {
 if (!file) return;
 const istPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 if (istPdf) {
-// PDF direkt als Daten-URL speichern (max ~700KB wegen Firestore)
-if (file.size > 900 * 1024) {
-alert('Die PDF ist zu groß (max. ca. 700 KB). Bitte eine kleinere PDF verwenden oder als Bild hochladen.');
+// PDF in ein Bild umwandeln (erste Seite), damit es auf ALLEN Geräten direkt angezeigt wird
+if (!window.pdfjsLib) {
+alert('PDF-Umwandlung wird geladen. Bitte die Seite neu laden und nochmal versuchen.');
 return;
 }
 const reader = new FileReader();
 reader.onload = (e) => {
-window.fb.set('platzImg', e.target.result);
-window.fb.set('platzTyp', 'pdf');
+const typedarray = new Uint8Array(e.target.result);
+pdfjsLib.getDocument({ data: typedarray }).promise.then(pdf => {
+return pdf.getPage(1);
+}).then(page => {
+// Hohe Auflösung für scharfe Anzeige
+const viewport = page.getViewport({ scale: 2.0 });
+const canvas = document.createElement('canvas');
+canvas.width = viewport.width;
+canvas.height = viewport.height;
+return page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise.then(() => {
+// Auf vernünftige Größe begrenzen
+let outCanvas = canvas;
+const maxDim = 1600;
+if (canvas.width > maxDim || canvas.height > maxDim) {
+const scale = maxDim / Math.max(canvas.width, canvas.height);
+outCanvas = document.createElement('canvas');
+outCanvas.width = Math.round(canvas.width * scale);
+outCanvas.height = Math.round(canvas.height * scale);
+outCanvas.getContext('2d').drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height);
+}
+const dataUrl = outCanvas.toDataURL('image/jpeg', 0.82);
+if (dataUrl.length > 900 * 1024) {
+// Falls zu groß, nochmal kleiner
+const c2 = document.createElement('canvas');
+const sc = 1100 / Math.max(outCanvas.width, outCanvas.height);
+c2.width = Math.round(outCanvas.width * sc);
+c2.height = Math.round(outCanvas.height * sc);
+c2.getContext('2d').drawImage(outCanvas, 0, 0, c2.width, c2.height);
+window.fb.set('platzImg', c2.toDataURL('image/jpeg', 0.75));
+} else {
+window.fb.set('platzImg', dataUrl);
+}
+window.fb.set('platzTyp', 'bild');
+alert('Platzbelegung hochgeladen! Sie wird jetzt überall direkt angezeigt. ✅');
+});
+}).catch(err => {
+console.error('PDF-Umwandlung fehlgeschlagen:', err);
+alert('Die PDF konnte nicht umgewandelt werden. Bitte versuche es mit einem Foto/Screenshot der Platzbelegung.');
+});
 };
-reader.readAsDataURL(file);
+reader.readAsArrayBuffer(file);
 return;
 }
 // sonst: Bild (wird verkleinert)
