@@ -218,8 +218,8 @@ setCancellations(filtered.sort((a, b) => b.created - a.created));
 return () => unsubs.forEach(u => u && u());
 }, [fbReady]);
 useEffect(() => { if (chatEnd.current) chatEnd.current.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-// Laufende Prüfung: Ist der eingeloggte Trainer/Vorstand noch gültig?
-// Wenn sein Zugang gelöscht oder Name/Passwort geändert wurde -> automatisch ausloggen.
+// Laufende Prüfung: Hat der eingeloggte Nutzer einen gültigen Zugang?
+// Nur Admin oder ein gültiger Trainer-/Vorstand-Zugang darf drin bleiben. Alles andere wird ausgeloggt.
 useEffect(() => {
 if (!nickname) return;
 if (!trainersGeladen) return; // erst prüfen, wenn die Zugänge wirklich geladen sind
@@ -227,15 +227,13 @@ if (localStorage.getItem('fcg_admin') === '1') return; // Admin bleibt immer
 const tid = localStorage.getItem('fcg_tid');
 const savedPw = localStorage.getItem('fcg_pw');
 const savedNick = (localStorage.getItem('fcg_nick') || '').toLowerCase();
-// Wenn kein Trainer-Login gespeichert ist, nichts tun
-if (!tid && !savedPw) return;
-// Passenden Zugang suchen: gleiche ID ODER gleicher Name, und Passwort muss noch stimmen
-const gueltig = trainers.find(t =>
+// Gültig ist nur, wer einen passenden Trainer-Zugang hat (ID oder Name + korrektes Passwort)
+const gueltig = (tid || savedPw) ? trainers.find(t =>
 (String(t.id) === tid || t.name.toLowerCase() === savedNick) && t.pw === savedPw
-);
+) : null;
 if (!gueltig) {
-// Zugang gelöscht oder Passwort/Name geändert -> rauswerfen
-alert('Dein Zugang wurde geändert oder entfernt. Bitte melde dich mit deinen neuen Daten an.');
+// Kein gültiger Zugang (alter Login, gelöscht oder Passwort/Name geändert) -> rauswerfen
+alert('Dein Zugang ist nicht mehr gültig. Bitte melde dich mit deinem aktuellen Zugang an.');
 logout();
 }
 }, [trainers, nickname, trainersGeladen]);
