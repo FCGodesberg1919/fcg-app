@@ -115,6 +115,12 @@ const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag
 // Buchstaben-Gruppen (von G/Bambini bis A)
 const LETTERS = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
 const NUMBERS = [1, 2, 3, 4];
+// Spezielle Beschriftungen für die G-Klassen (Bambini): interner Schlüssel -> Anzeige
+const G_OPTIONS = [
+  { key: 1, label: 'Gr.1 / 2020' },
+  { key: 2, label: 'Gr.2 / 2020' },
+  { key: 3, label: 'Gr.1 / 2021' },
+];
 // Teams: key = "C3", value = { day, time }
 // Trainer pflegt hier Wochentag + Zeit. Admin kann alles ändern.
 const DEFAULT_TEAMS = {
@@ -153,6 +159,10 @@ function teamKey(letter, num) {
 return letter + num;
 }
 function teamLabel(letter, num) {
+if (letter === 'G') {
+const opt = G_OPTIONS.find(o => o.key === Number(num));
+if (opt) return opt.label;
+}
 return letter + num;
 }
 const DEFAULT_EVENTS = [
@@ -628,13 +638,13 @@ return (
 ))}
 </div>
 </div>
-{/* Spalte 2: Nummern */}
+{/* Spalte 2: Nummern (bei G spezielle Gruppen) */}
 <div className="bg-slate-800 rounded-xl border border-slate-700 p-3">
 <p className="text-slate-400 text-xs font-semibold mb-2 text-center">Mannschaft</p>
 <div className="space-y-2">
-{NUMBERS.map(n => (
-<button key={n} onClick={() => { setNum(n); }} disabled={!letter} className={"w-full py-3 rounded-lg font-bold text-lg transition " + (num === n ? 'bg-red-700 text-white' : 'bg-slate-700 text-slate-200 hover:bg-slate-600') + (!letter ? ' opacity-40 cursor-not-allowed' : '')}>
-{n}
+{(letter === 'G' ? G_OPTIONS.map(o => o.key) : NUMBERS).map(n => (
+<button key={n} onClick={() => { setNum(n); }} disabled={!letter} className={"w-full py-3 rounded-lg font-bold transition " + (letter === 'G' ? 'text-base ' : 'text-lg ') + (num === n ? 'bg-red-700 text-white' : 'bg-slate-700 text-slate-200 hover:bg-slate-600') + (!letter ? ' opacity-40 cursor-not-allowed' : '')}>
+{letter === 'G' ? teamLabel('G', n) : n}
 </button>
 ))}
 </div>
@@ -993,9 +1003,12 @@ return (
 function TrainerVerwaltung({ trainers, addTrainer, delTrainer }) {
 const [name, setName] = useState('');
 const [team, setTeam] = useState('');
-// Alle möglichen Mannschaften aus Buchstaben + Nummern erzeugen
+// Alle möglichen Mannschaften erzeugen (G hat spezielle Gruppen, Rest 1-4)
 const alleTeams = [];
-for (const l of LETTERS) for (const n of NUMBERS) alleTeams.push(teamLabel(l, n));
+for (const l of LETTERS) {
+const nums = (l === 'G') ? G_OPTIONS.map(o => o.key) : NUMBERS;
+for (const n of nums) alleTeams.push(teamLabel(l, n));
+}
 
 const erstellen = () => {
 if (!name.trim()) { alert('Bitte einen Namen eingeben.'); return; }
