@@ -179,7 +179,7 @@ const [isAdmin, setIsAdmin] = useState(localStorage.getItem('fcg_admin') === '1'
 const [isVorstand, setIsVorstand] = useState(localStorage.getItem('fcg_vorstand') === '1');
 const [loginName, setLoginName] = useState('');
 const [loginPw, setLoginPw] = useState('');
-const myTeam = localStorage.getItem('fcg_team') || null; // Mannschaft des eingeloggten Trainers
+const myTeams = (localStorage.getItem('fcg_team') || '').split('|').filter(Boolean); // Mannschaften des eingeloggten Trainers
 const [page, setPage] = useState('home');
 const [menuOpen, setMenuOpen] = useState(false);
 const [messages, setMessages] = useState([]);
@@ -270,11 +270,12 @@ return;
 // 2. Trainer/Vorstand-Login: Name + Passwort muss zu einem Zugang passen
 const match = trainers.find(t => t.name.toLowerCase() === name.toLowerCase() && t.pw === pw);
 if (match) {
-const vorstand = match.team === 'ALLE';
+const meineTeams = trainerTeams(match);
+const vorstand = meineTeams.includes('ALLE');
 localStorage.setItem('fcg_nick', match.name);
 localStorage.removeItem('fcg_admin');
 if (vorstand) localStorage.setItem('fcg_vorstand', '1'); else localStorage.removeItem('fcg_vorstand');
-localStorage.setItem('fcg_team', match.team);
+localStorage.setItem('fcg_team', meineTeams.join('|')); // mehrere Teams mit | getrennt
 localStorage.setItem('fcg_tid', String(match.id)); // Zugang-ID merken
 localStorage.setItem('fcg_pw', match.pw); // Passwort merken (für Gültigkeitsprüfung)
 setIsAdmin(false); setIsVorstand(vorstand);
@@ -309,20 +310,29 @@ let pw = '';
 for (let i = 0; i < 6; i++) pw += zeichen[Math.floor(Math.random() * zeichen.length)];
 return pw;
 }
-// Trainer-Zugang hinzufügen (Name + Mannschaft, Passwort wird erzeugt)
-function addTrainer(name, team) {
-const t = { id: Date.now(), name: name.trim(), team, pw: genPassword() };
+// Trainer-Zugang hinzufügen (Name + eine oder mehrere Mannschaften, Passwort wird erzeugt)
+function addTrainer(name, teams) {
+// teams kann ein String (eine Mannschaft) oder ein Array sein -> immer als Array speichern
+const teamListe = Array.isArray(teams) ? teams : [teams];
+const t = { id: Date.now(), name: name.trim(), teams: teamListe, pw: genPassword() };
 window.fb.set('trainers', [...trainers, t]);
 }
 function delTrainer(id) { window.fb.set('trainers', trainers.filter(t => t.id !== id)); }
+// Hilfsfunktion: gibt die Mannschaften eines Zugangs als Array zurück (abwärtskompatibel mit altem 'team')
+function trainerTeams(t) {
+if (Array.isArray(t.teams)) return t.teams;
+if (t.team) return [t.team];
+return [];
+}
 // Prüfen ob Name+Passwort für eine Mannschaft (oder Vorstand=ALLE) gültig ist
-function checkTrainerAuth(name, pw, teamKey) {
+function checkTrainerAuth(name, pw, teamLbl) {
 const n = (name || '').trim().toLowerCase();
 const p = (pw || '').trim();
 const match = trainers.find(t => t.name.toLowerCase() === n && t.pw === p);
 if (!match) return false;
-if (match.team === 'ALLE') return true; // Vorstand-Notfallzugang
-return match.team === teamKey;
+const ts = trainerTeams(match);
+if (ts.includes('ALLE')) return true; // Vorstand-Notfallzugang
+return ts.includes(teamLbl);
 }
 function delCancellation(id) { window.fb.set('cancellations', cancellations.filter(c => c.id !== id)); }
 function addUnit(classId, team, time, day) {
@@ -454,7 +464,7 @@ return (
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
 {page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin: canEdit, delAnn, addAnn, events, delEvent, addEvent }} />}
-{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeam }} />}
+{page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeams }} />}
 {page === 'platz' && <PlatzPage {...{ platzImg, platzImg2, isAdmin: canEdit, uploadPlatz, removePlatz }} />}
 {page === 'forms' && <FormsPage {...{ forms, isAdmin: canEdit, addForm, delForm }} />}
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin: canEdit, nickname, delCancellation }} />}
@@ -614,14 +624,14 @@ return (
 </div>
 );
 }
-function ClassesPage({ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeam }) {
+function ClassesPage({ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeams }) {
 const [letter, setLetter] = useState(null);
 const [num, setNum] = useState(null);
 const selKey = (letter && num) ? teamKey(letter, num) : null;
 const info = selKey ? teams[selKey] : null;
 const selLabel = (letter && num) ? teamLabel(letter, num) : null;
 // Darf der eingeloggte Nutzer dieses Team absagen?
-const darfAbsagen = isAdmin || isVorstand || (myTeam && selLabel && myTeam === selLabel);
+const darfAbsagen = isAdmin || isVorstand || (selLabel && myTeams && myTeams.includes(selLabel));
 return (
 <div className="space-y-4">
 <h2 className="text-2xl font-bold text-white">⚽ Training & Absagen</h2>
@@ -999,10 +1009,11 @@ return (
 </div>
 );
 }
-// Verwaltung der Trainer-Zugänge (Name + Mannschaft + automatisches Passwort)
+// Verwaltung der Trainer-Zugänge (Name + eine oder mehrere Mannschaften + automatisches Passwort)
 function TrainerVerwaltung({ trainers, addTrainer, delTrainer }) {
 const [name, setName] = useState('');
-const [team, setTeam] = useState('');
+const [ausgewaehlt, setAusgewaehlt] = useState([]); // Liste der gewählten Mannschaften
+const [istVorstand, setIstVorstand] = useState(false);
 // Alle möglichen Mannschaften erzeugen (G hat spezielle Gruppen, Rest 1-4)
 const alleTeams = [];
 for (const l of LETTERS) {
@@ -1010,25 +1021,49 @@ const nums = (l === 'G') ? G_OPTIONS.map(o => o.key) : NUMBERS;
 for (const n of nums) alleTeams.push(teamLabel(l, n));
 }
 
+const toggleTeam = (tm) => {
+setAusgewaehlt(prev => prev.includes(tm) ? prev.filter(x => x !== tm) : [...prev, tm]);
+};
+
 const erstellen = () => {
 if (!name.trim()) { alert('Bitte einen Namen eingeben.'); return; }
-if (!team) { alert('Bitte eine Mannschaft wählen.'); return; }
-addTrainer(name, team);
-setName(''); setTeam('');
+if (istVorstand) {
+addTrainer(name, ['ALLE']);
+} else {
+if (ausgewaehlt.length === 0) { alert('Bitte mindestens eine Mannschaft auswählen.'); return; }
+addTrainer(name, ausgewaehlt);
+}
+setName(''); setAusgewaehlt([]); setIstVorstand(false);
 };
 
 return (
 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
 <h3 className="text-white text-xl font-bold mb-2">🔑 Trainer-Zugänge</h3>
-<p className="text-slate-400 text-sm mb-4">Lege fest, wer welche Mannschaft absagen darf. Das Passwort wird automatisch erzeugt. Gib Name + Passwort an den Trainer weiter.</p>
+<p className="text-slate-400 text-sm mb-4">Lege fest, wer welche Mannschaft(en) absagen darf. Ein Zugang kann auch mehrere Mannschaften haben. Das Passwort wird automatisch erzeugt. Gib Name + Passwort an den Trainer weiter.</p>
 
-<div className="bg-slate-900 p-4 rounded-lg border border-slate-700 mb-4 space-y-2">
-<input placeholder="Name (z.B. Markus)" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
-<select value={team} onChange={e => setTeam(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm">
-<option value="">— Mannschaft wählen —</option>
-<option value="ALLE">🆘 Vorstand (darf ALLE absagen)</option>
-{alleTeams.map(t => <option key={t} value={t}>{t}</option>)}
-</select>
+<div className="bg-slate-900 p-4 rounded-lg border border-slate-700 mb-4 space-y-3">
+<input placeholder="Name (z.B. Sabine)" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+
+<label className="flex items-center gap-2 text-sm text-yellow-300 cursor-pointer bg-slate-800 p-2 rounded">
+<input type="checkbox" checked={istVorstand} onChange={e => setIstVorstand(e.target.checked)} />
+🆘 Vorstand (darf ALLE Mannschaften absagen)
+</label>
+
+{!istVorstand && (
+<div>
+<p className="text-slate-400 text-xs mb-2">Mannschaft(en) auswählen (eine oder mehrere):</p>
+<div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto">
+{alleTeams.map(tm => (
+<label key={tm} className={"flex items-center gap-1.5 text-xs px-2 py-1.5 rounded cursor-pointer " + (ausgewaehlt.includes(tm) ? 'bg-red-700 text-white' : 'bg-slate-700 text-slate-200')}>
+<input type="checkbox" checked={ausgewaehlt.includes(tm)} onChange={() => toggleTeam(tm)} />
+{tm}
+</label>
+))}
+</div>
+{ausgewaehlt.length > 0 && <p className="text-green-400 text-xs mt-2">Gewählt: {ausgewaehlt.join(', ')}</p>}
+</div>
+)}
+
 <button onClick={erstellen} className="w-full bg-green-700 hover:bg-green-600 text-white py-2 rounded text-sm font-semibold">+ Zugang erstellen (Passwort wird erzeugt)</button>
 </div>
 
@@ -1036,15 +1071,19 @@ return (
 <p className="text-slate-500 text-sm">Noch keine Trainer-Zugänge angelegt.</p>
 ) : (
 <div className="space-y-2">
-{trainers.map(t => (
+{trainers.map(t => {
+const ts = Array.isArray(t.teams) ? t.teams : (t.team ? [t.team] : []);
+const anzeige = ts.includes('ALLE') ? '🆘 Vorstand (alle)' : ts.join(', ');
+return (
 <div key={t.id} className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700">
 <div className="text-sm">
-<p className="text-white font-semibold">{t.name} <span className="text-slate-400 font-normal">· {t.team === 'ALLE' ? '🆘 Vorstand (alle)' : t.team}</span></p>
+<p className="text-white font-semibold">{t.name} <span className="text-slate-400 font-normal">· {anzeige}</span></p>
 <p className="text-slate-300">Passwort: <span className="font-mono bg-slate-700 px-2 py-0.5 rounded text-yellow-300">{t.pw}</span></p>
 </div>
 <button onClick={() => { if (confirm('Zugang von ' + t.name + ' wirklich löschen?')) delTrainer(t.id); }} className="text-red-400 hover:text-red-300 text-sm bg-slate-700 px-3 py-1.5 rounded">🗑️</button>
 </div>
-))}
+);
+})}
 </div>
 )}
 </div>
