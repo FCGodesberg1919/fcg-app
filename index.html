@@ -152,6 +152,14 @@ d.setDate(d.getDate() + 7);
 }
 return out;
 }
+// Liest die Trainingseinheiten eines Teams aus (abwärtskompatibel: altes {day,time} -> Liste)
+function getEinheiten(info) {
+if (!info) return [];
+if (Array.isArray(info.einheiten)) return info.einheiten;
+// altes Format: einzelnes {day, time}
+if (info.day !== undefined && info.day !== null && info.day !== '') return [{ day: info.day, time: info.time || '' }];
+return [];
+}
 function formatDatum(d) {
 return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
@@ -674,12 +682,21 @@ Bitte links einen Jahrgang und rechts eine Nummer wählen.
 }
 function TeamPanel({ teamKey, label, info, isAdmin, onCancel, onSaveInfo, darfAbsagen }) {
 const [edit, setEdit] = useState(false);
-const termine = info ? naechsteTermine(info.day, 3) : [];
-const dayLabel = (info && info.day !== undefined && info.day !== null && info.day !== '') ? WEEKDAYS[Number(info.day)] : null;
+const einheiten = getEinheiten(info);
+// Termine für ALLE Einheiten generieren (mit Tag + Zeit), nach Datum sortiert
+const termine = [];
+for (const e of einheiten) {
+for (const d of naechsteTermine(e.day, 3)) {
+termine.push({ datum: d, time: e.time || '' });
+}
+}
+termine.sort((a, b) => a.datum - b.datum);
+// Anzeige der Trainingszeiten oben (z.B. "Mo · 18:00 | Mi · 17:30")
+const zeitenText = einheiten.map(e => WEEKDAYS[Number(e.day)] + (e.time ? ' · ' + e.time : '')).join('  |  ');
 
-const sendeAbsage = (d) => {
-const datumStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-onCancel('', label, info ? info.time : '', datumStr);
+const sendeAbsage = (eintrag) => {
+const datumStr = eintrag.datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+onCancel('', label, eintrag.time, datumStr);
 alert('Absage gesendet! Alle Mitglieder bekommen jetzt eine Benachrichtigung. 🔔');
 };
 
@@ -688,7 +705,7 @@ return (
 <div className="flex items-center justify-between mb-3">
 <div>
 <h3 className="text-white text-xl font-bold">{label}</h3>
-{info ? <p className="text-slate-400 text-sm">{dayLabel}{info.time ? ' · ' + info.time : ''}</p> : <p className="text-yellow-400 text-sm">Noch kein Trainingstag hinterlegt</p>}
+{einheiten.length > 0 ? <p className="text-slate-400 text-sm">{zeitenText}</p> : <p className="text-yellow-400 text-sm">Noch kein Trainingstag hinterlegt</p>}
 </div>
 {isAdmin && <button onClick={() => setEdit(!edit)} className="text-slate-400 hover:text-yellow-400 text-sm bg-slate-700 px-3 py-1.5 rounded-lg">✏️ Bearbeiten</button>}
 </div>
@@ -701,39 +718,74 @@ return (
 </div>
 )}
 {!edit && darfAbsagen && (
-info && termine.length > 0 ? (
+termine.length > 0 ? (
 <div>
 <p className="text-slate-300 text-sm mb-2">Welcher Termin fällt aus? (Tippen zum Absagen)</p>
 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
-{termine.map((d, i) => (
-<button key={i} onClick={() => sendeAbsage(d)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
-{formatDatum(d)}
+{termine.map((eintrag, i) => (
+<button key={i} onClick={() => sendeAbsage(eintrag)} className="bg-slate-700 hover:bg-red-700 text-white text-sm px-2 py-2.5 rounded-lg border border-slate-600 hover:border-red-500 transition">
+{formatDatum(eintrag.datum)}{eintrag.time ? <span className="block text-xs text-slate-400">{eintrag.time}</span> : null}
 </button>
 ))}
 </div>
 </div>
 ) : (
-<p className="text-slate-500 text-sm">{isAdmin ? 'Bitte oben über ✏️ Bearbeiten einen Wochentag + Zeit festlegen, dann erscheinen hier die Termine.' : 'Für dieses Team ist noch kein Training hinterlegt. Bitte beim Admin melden.'}</p>
+<p className="text-slate-500 text-sm">{isAdmin ? 'Bitte oben über ✏️ Bearbeiten Trainingstage festlegen, dann erscheinen hier die Termine.' : 'Für dieses Team ist noch kein Training hinterlegt. Bitte beim Admin melden.'}</p>
 )
 )}
 </div>
 );
 }
 function TeamEditForm({ teamKey, info, onSave, onDelete, onCancel }) {
-const [day, setDay] = useState(info && info.day !== undefined && info.day !== null ? String(info.day) : '');
-const [time, setTime] = useState(info ? (info.time || '') : '');
-const save = () => { if (day === '') { alert('Bitte einen Wochentag wählen.'); return; } onSave({ day: Number(day), time: time.trim() }); };
+// Bestehende Einheiten laden (abwärtskompatibel)
+const [einheiten, setEinheiten] = useState(getEinheiten(info));
+const [day, setDay] = useState('');
+const [time, setTime] = useState('');
+
+const hinzufuegen = () => {
+if (day === '') { alert('Bitte einen Wochentag wählen.'); return; }
+setEinheiten([...einheiten, { day: Number(day), time: time.trim() }]);
+setDay(''); setTime('');
+};
+const entfernen = (i) => setEinheiten(einheiten.filter((_, idx) => idx !== i));
+const speichern = () => {
+let liste = einheiten;
+// Falls noch was im Eingabefeld steht, automatisch mit übernehmen
+if (day !== '') liste = [...einheiten, { day: Number(day), time: time.trim() }];
+if (liste.length === 0) { alert('Bitte mindestens eine Trainingseinheit hinzufügen.'); return; }
+onSave({ einheiten: liste });
+};
+
 return (
-<div className="mb-3 bg-slate-900 p-3 rounded-lg border border-yellow-700 space-y-2">
-<p className="text-yellow-300 text-xs font-semibold">✏️ {teamKey} bearbeiten</p>
+<div className="mb-3 bg-slate-900 p-3 rounded-lg border border-yellow-700 space-y-3">
+<p className="text-yellow-300 text-xs font-semibold">✏️ {teamKey} – Trainingszeiten</p>
+
+{/* Bereits hinzugefügte Einheiten */}
+{einheiten.length > 0 && (
+<div className="space-y-1">
+{einheiten.map((e, i) => (
+<div key={i} className="flex items-center justify-between bg-slate-800 px-3 py-2 rounded text-sm">
+<span className="text-white">{WEEKDAYS[Number(e.day)]}{e.time ? ' · ' + e.time : ''}</span>
+<button onClick={() => entfernen(i)} className="text-red-400 hover:text-red-300 text-xs">🗑️ entfernen</button>
+</div>
+))}
+</div>
+)}
+
+{/* Neue Einheit hinzufügen */}
+<div className="bg-slate-800 p-2 rounded space-y-2">
+<p className="text-slate-400 text-xs">Trainingstag hinzufügen:</p>
 <select value={day} onChange={e => setDay(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm">
 <option value="">— Wochentag wählen —</option>
 {WEEKDAYS.map((w, i) => <option key={i} value={i}>{w}</option>)}
 </select>
 <input placeholder="Zeit (z.B. 18:15 – 19:45)" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-700 text-white rounded px-3 py-2 text-sm" />
+<button onClick={hinzufuegen} className="w-full bg-slate-600 hover:bg-slate-500 text-white py-1.5 rounded text-xs font-semibold">+ Tag hinzufügen</button>
+</div>
+
 <div className="flex gap-2">
-<button onClick={save} className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded text-sm">✓ Speichern</button>
-{info && <button onClick={onDelete} className="bg-red-700 hover:bg-red-600 text-white py-2 px-3 rounded text-sm">🗑️ Löschen</button>}
+<button onClick={speichern} className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded text-sm">✓ Speichern</button>
+{info && <button onClick={onDelete} className="bg-red-700 hover:bg-red-600 text-white py-2 px-3 rounded text-sm">🗑️ Alle löschen</button>}
 <button onClick={onCancel} className="bg-slate-600 text-white py-2 px-3 rounded text-sm">Abbrechen</button>
 </div>
 </div>
