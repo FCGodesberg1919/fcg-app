@@ -187,15 +187,8 @@
 
                 <div class="checkbox-group">
                     <label>
-                        <input type="checkbox" id="accept_pflicht" required>
-                        <span><strong>Ich habe die Datenschutzerklärung gelesen und stimme der Verarbeitung der Daten meines Kindes für die Mitgliederverwaltung zu (verpflichtend) *</strong></span>
-                    </label>
-                </div>
-
-                <div class="checkbox-group">
-                    <label>
-                        <input type="checkbox" id="accept_fotos">
-                        <span>Ich willige ein, dass Fotos und Videos meines Kindes von Vereinsveranstaltungen auf der Website und den Social-Media-Kanälen (Instagram, Facebook, YouTube, TikTok) des 1. FC Godesberg veröffentlicht werden. Diese Einwilligung ist freiwillig und kann jederzeit widerrufen werden. <em>(optional)</em></span>
+                        <input type="checkbox" id="accept" required>
+                        <span><strong>Ich habe die Datenschutzerklärung gelesen und bestätige diese (bei Minderjährigen als Erziehungsberechtigte/r).</strong></span>
                     </label>
                 </div>
 
@@ -218,7 +211,6 @@
             const kindGeburtsdatum = document.getElementById('kind_geburtsdatum').value;
             const elternName = document.getElementById('eltern_name').value;
             const elternEmail = document.getElementById('eltern_email').value;
-            const fotosErlaubt = document.getElementById('accept_fotos').checked ? 'JA' : 'NEIN';
             const jetzt = new Date();
             const zeitstempel = jetzt.toLocaleString('de-DE');
 
@@ -228,10 +220,9 @@
             formData.append('Spieler Geburtsdatum', kindGeburtsdatum);
             formData.append('Erziehungsberechtigte/r', elternName);
             formData.append('E-Mail', elternEmail);
-            formData.append('Datenschutz akzeptiert', 'JA (Pflicht)');
-            formData.append('Foto-Einwilligung Social Media', fotosErlaubt);
+            formData.append('Datenschutz akzeptiert', 'JA');
             formData.append('Zeitstempel', zeitstempel);
-            formData.append('_subject', `Anmeldung: ${kindVorname} ${kindNachname} (Foto: ${fotosErlaubt})`);
+            formData.append('_subject', `Anmeldung: ${kindVorname} ${kindNachname}`);
 
             try {
                 await fetch('https://formspree.io/f/xlgyrwop', {
