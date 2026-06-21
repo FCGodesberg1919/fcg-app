@@ -145,3 +145,107 @@
 
         <div class="pdf-section">
             <div class="pdf-info">
+                ℹ️ Bitte lesen Sie die Datenschutzerklärung und bestätigen Sie diese mit Ihren Daten.
+            </div>
+            
+            <iframe src="https://FCGodesberg1919.github.io/fcg-app/Datenschutzerklaerung_Formular2026.pdf#toolbar=1" 
+                    title="Datenschutzerklärung"></iframe>
+        </div>
+
+        <div class="form-section">
+            <h3>✓ Datenschutzerklärung bestätigen</h3>
+
+            <form id="form">
+                <h4>Angaben zum Spieler/Kind</h4>
+
+                <div class="form-group">
+                    <label for="kind_vorname">Vorname des Spielers *</label>
+                    <input type="text" id="kind_vorname" name="kind_vorname" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="kind_nachname">Nachname des Spielers *</label>
+                    <input type="text" id="kind_nachname" name="kind_nachname" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="kind_geburtsdatum">Geburtsdatum des Spielers *</label>
+                    <input type="date" id="kind_geburtsdatum" name="kind_geburtsdatum" required>
+                </div>
+
+                <h4 style="margin-top: 25px;">Angaben zum Erziehungsberechtigten</h4>
+
+                <div class="form-group">
+                    <label for="eltern_name">Name des/der Erziehungsberechtigten *</label>
+                    <input type="text" id="eltern_name" name="eltern_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="eltern_email">E-Mail-Adresse *</label>
+                    <input type="email" id="eltern_email" name="eltern_email" required>
+                </div>
+
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="accept_pflicht" required>
+                        <span><strong>Ich habe die Datenschutzerklärung gelesen und stimme der Verarbeitung der Daten meines Kindes für die Mitgliederverwaltung zu (verpflichtend) *</strong></span>
+                    </label>
+                </div>
+
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="accept_fotos">
+                        <span>Ich willige ein, dass Fotos und Videos meines Kindes von Vereinsveranstaltungen auf der Website und den Social-Media-Kanälen (Instagram, Facebook, YouTube, TikTok) des 1. FC Godesberg veröffentlicht werden. Diese Einwilligung ist freiwillig und kann jederzeit widerrufen werden. <em>(optional)</em></span>
+                    </label>
+                </div>
+
+                <button type="submit">✓ Absenden</button>
+
+                <div class="success" id="success">
+                    ✓ Erfolgreich abgesendet!<br>
+                    <div class="timestamp" id="zeit"></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const kindVorname = document.getElementById('kind_vorname').value;
+            const kindNachname = document.getElementById('kind_nachname').value;
+            const kindGeburtsdatum = document.getElementById('kind_geburtsdatum').value;
+            const elternName = document.getElementById('eltern_name').value;
+            const elternEmail = document.getElementById('eltern_email').value;
+            const fotosErlaubt = document.getElementById('accept_fotos').checked ? 'JA' : 'NEIN';
+            const jetzt = new Date();
+            const zeitstempel = jetzt.toLocaleString('de-DE');
+
+            const formData = new FormData();
+            formData.append('Spieler Vorname', kindVorname);
+            formData.append('Spieler Nachname', kindNachname);
+            formData.append('Spieler Geburtsdatum', kindGeburtsdatum);
+            formData.append('Erziehungsberechtigte/r', elternName);
+            formData.append('E-Mail', elternEmail);
+            formData.append('Datenschutz akzeptiert', 'JA (Pflicht)');
+            formData.append('Foto-Einwilligung Social Media', fotosErlaubt);
+            formData.append('Zeitstempel', zeitstempel);
+            formData.append('_subject', `Anmeldung: ${kindVorname} ${kindNachname} (Foto: ${fotosErlaubt})`);
+
+            try {
+                await fetch('https://formspree.io/f/xlgyrwop', {
+                    method: 'POST',
+                    body: formData
+                });
+            } catch (err) {
+                console.log('Email konnte nicht versendet werden');
+            }
+
+            document.getElementById('form').style.display = 'none';
+            document.getElementById('success').style.display = 'block';
+            document.getElementById('zeit').innerHTML = `Akzeptiert: ${zeitstempel}`;
+        });
+    </script>
+</body>
+</html>
