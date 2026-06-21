@@ -200,6 +200,7 @@
             formData.append('Akzeptiert', 'Ja');
             formData.append('Zeitstempel', zeitstempel);
             formData.append('_subject', `Datenschutzerklärung akzeptiert: ${vorname} ${nachname}`);
+            formData.append('_replyto', 'info@fc-godesberg.de');
 
             try {
                 await fetch('https://formspree.io/f/xlgyrwop', {
