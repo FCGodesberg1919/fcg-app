@@ -56,6 +56,10 @@
             margin-bottom: 20px;
             font-size: 16px;
         }
+        .form-section h4 {
+            color: #8b0000;
+            font-size: 15px;
+        }
         .form-group {
             margin-bottom: 15px;
         }
@@ -66,7 +70,9 @@
             margin-bottom: 5px;
             font-size: 14px;
         }
-        input {
+        input[type="text"],
+        input[type="email"],
+        input[type="date"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -79,14 +85,14 @@
             background: #fff8f8;
         }
         .checkbox-group {
-            margin: 20px 0;
+            margin: 15px 0;
             padding: 15px;
             background: #fff8f8;
             border-radius: 5px;
         }
         .checkbox-group label {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             font-weight: normal;
             margin: 0;
             cursor: pointer;
@@ -94,6 +100,7 @@
         .checkbox-group input[type="checkbox"] {
             width: auto;
             margin-right: 10px;
+            margin-top: 3px;
             cursor: pointer;
         }
         button {
@@ -107,13 +114,10 @@
             font-weight: bold;
             cursor: pointer;
             transition: background 0.3s;
+            margin-top: 10px;
         }
         button:hover:not(:disabled) {
             background: #a00000;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
         }
         .success {
             display: none;
@@ -123,6 +127,7 @@
             padding: 15px;
             border-radius: 5px;
             text-align: center;
+            margin-top: 15px;
         }
         .timestamp {
             text-align: center;
@@ -140,80 +145,3 @@
 
         <div class="pdf-section">
             <div class="pdf-info">
-                ℹ️ Bitte lies die Datenschutzerklärung und bestätige dann mit deinen Daten.
-            </div>
-            
-            <iframe src="https://FCGodesberg1919.github.io/fcg-app/Datenschutzerklaerung_Formular2026.pdf#toolbar=1" 
-                    title="Datenschutzerklärung"></iframe>
-        </div>
-
-        <div class="form-section">
-            <h3>✓ Datenschutzerklärung akzeptieren</h3>
-
-            <form id="form">
-                <div class="form-group">
-                    <label for="vorname">Vorname *</label>
-                    <input type="text" id="vorname" name="vorname" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="nachname">Nachname *</label>
-                    <input type="text" id="nachname" name="nachname" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="geburtsdatum">Geburtsdatum *</label>
-                    <input type="date" id="geburtsdatum" name="geburtsdatum" required>
-                </div>
-
-                <div class="checkbox-group">
-                    <label>
-                        <input type="checkbox" id="accept" required>
-                        <span><strong>Ich akzeptiere die oben genannte Datenschutzerklärung</strong></span>
-                    </label>
-                </div>
-
-                <button type="submit">✓ Akzeptieren</button>
-
-                <div class="success" id="success">
-                    ✓ Erfolgreich akzeptiert!<br>
-                    <div class="timestamp" id="zeit"></div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const vorname = document.getElementById('vorname').value;
-            const nachname = document.getElementById('nachname').value;
-            const geburtsdatum = document.getElementById('geburtsdatum').value;
-            const jetzt = new Date();
-            const zeitstempel = jetzt.toLocaleString('de-DE');
-
-            const formData = new FormData();
-            formData.append('Vorname', vorname);
-            formData.append('Nachname', nachname);
-            formData.append('Geburtsdatum', geburtsdatum);
-            formData.append('Akzeptiert', 'Ja');
-            formData.append('Zeitstempel', zeitstempel);
-            formData.append('_subject', `Datenschutzerklärung akzeptiert: ${vorname} ${nachname}`);
-            
-            try {
-                await fetch('https://formspree.io/f/xlgyrwop', {
-                    method: 'POST',
-                    body: formData
-                });
-            } catch (err) {
-                console.log('Email konnte nicht versendet werden');
-            }
-
-            document.getElementById('form').style.display = 'none';
-            document.getElementById('success').style.display = 'block';
-            document.getElementById('zeit').innerHTML = `Akzeptiert: ${zeitstempel}`;
-        });
-    </script>
-</body>
-</html>
