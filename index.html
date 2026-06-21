@@ -255,6 +255,20 @@ alert('Dein Zugang ist nicht mehr gültig. Bitte melde dich mit deinem aktuellen
 logout();
 }
 }, [trainers, nickname, trainersGeladen]);
+// Übermittelt den Namen an OneSignal, damit man im Dashboard sieht, welches Gerät zu wem gehört
+function onesignalSetName(name) {
+try {
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+window.OneSignalDeferred.push(async function(OneSignal) {
+try {
+// External ID setzen (eindeutige Kennung pro Person)
+await OneSignal.login(name.toLowerCase());
+// Zusätzlich als lesbares Tag, taucht im Dashboard auf
+await OneSignal.User.addTag('name', name);
+} catch (e) { console.log('OneSignal Name setzen:', e); }
+});
+} catch (e) { console.log('OneSignal nicht bereit:', e); }
+}
 function login() {
 const name = loginName.trim();
 const pw = loginPw.trim();
@@ -269,6 +283,7 @@ localStorage.removeItem('fcg_pw');
 localStorage.setItem('fcg_nick', ADMIN_NICK);
 setIsAdmin(true); setIsVorstand(false);
 setNickname(ADMIN_NICK);
+onesignalSetName(ADMIN_NICK);
 setPage('home'); setLoginName(''); setLoginPw('');
 const exists = members.find(x => x.nickname.toLowerCase() === ADMIN_NICK.toLowerCase());
 if (!exists) window.fb.set('members', [...members, { nickname: ADMIN_NICK, joined: new Date().toLocaleDateString('de-DE') }]);
@@ -288,6 +303,7 @@ localStorage.setItem('fcg_tid', String(match.id)); // Zugang-ID merken
 localStorage.setItem('fcg_pw', match.pw); // Passwort merken (für Gültigkeitsprüfung)
 setIsAdmin(false); setIsVorstand(vorstand);
 setNickname(match.name);
+onesignalSetName(match.name);
 setPage('home'); setLoginName(''); setLoginPw('');
 const exists = members.find(x => x.nickname.toLowerCase() === match.name.toLowerCase());
 if (!exists) window.fb.set('members', [...members, { nickname: match.name, joined: new Date().toLocaleDateString('de-DE') }]);
@@ -297,7 +313,7 @@ return;
 alert('Falscher Name oder falsches Passwort. Bitte wende dich an den Admin.');
 setLoginPw('');
 }
-function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_vorstand'); localStorage.removeItem('fcg_team'); localStorage.removeItem('fcg_tid'); localStorage.removeItem('fcg_pw'); setNickname(null); setIsAdmin(false); setIsVorstand(false); setLoginName(''); setLoginPw(''); }
+function logout() { localStorage.removeItem('fcg_nick'); localStorage.removeItem('fcg_admin'); localStorage.removeItem('fcg_vorstand'); localStorage.removeItem('fcg_team'); localStorage.removeItem('fcg_tid'); localStorage.removeItem('fcg_pw'); try { window.OneSignalDeferred = window.OneSignalDeferred || []; window.OneSignalDeferred.push(async function(OneSignal) { try { await OneSignal.logout(); } catch(e){} }); } catch(e){} setNickname(null); setIsAdmin(false); setIsVorstand(false); setLoginName(''); setLoginPw(''); }
 function sendMessage() {
 if (!newMsg.trim()) return;
 const msg = { id: Date.now(), user: nickname, text: newMsg.trim(), time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) };
