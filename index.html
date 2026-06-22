@@ -392,6 +392,16 @@ window.fb.set('announcements', [...announcements, { ...item, id: Date.now() }]);
 sendePushAnn(item.title, item.desc);
 }
 function delAnn(id) { window.fb.set('announcements', announcements.filter(a => a.id !== id)); }
+// Ankündigung in der Reihenfolge verschieben (richtung -1 = hoch, +1 = runter)
+function moveAnn(id, richtung) {
+const liste = [...announcements];
+const i = liste.findIndex(a => a.id === id);
+if (i === -1) return;
+const j = i + richtung;
+if (j < 0 || j >= liste.length) return; // schon ganz oben/unten
+[liste[i], liste[j]] = [liste[j], liste[i]]; // tauschen
+window.fb.set('announcements', liste);
+}
 function uploadPlatz(file, slot) {
 if (!file) return;
 const key = slot === 2 ? 'platzImg2' : 'platzImg';
@@ -495,7 +505,7 @@ return (
 <button onClick={logout} className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-700 mt-auto">🚪 Abmelden</button>
 </nav>
 <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full">
-{page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin: canEdit, delAnn, addAnn, events, delEvent, addEvent }} />}
+{page === 'home' && <HomePage {...{ nickname, cancellations, setPage, announcements, isAdmin: canEdit, delAnn, addAnn, moveAnn, events, delEvent, addEvent }} />}
 {page === 'classes' && <ClassesPage {...{ teams, setTeamInfo, isAdmin, isVorstand, addCancellation, myTeams }} />}
 {page === 'platz' && <PlatzPage {...{ platzImg, platzImg2, isAdmin: canEdit, uploadPlatz, removePlatz }} />}
 {page === 'forms' && <FormsPage {...{ forms, isAdmin: canEdit, addForm, delForm }} />}
@@ -574,7 +584,7 @@ Benachrichtigungen sind blockiert. Bitte erlaube sie in den Browser-Einstellunge
 </div>
 );
 }
-function HomePage({ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, events, delEvent, addEvent }) {
+function HomePage({ nickname, cancellations, setPage, announcements, isAdmin, delAnn, addAnn, moveAnn, events, delEvent, addEvent }) {
 return (
 <div className="space-y-6">
 <PushAktivieren />
@@ -598,7 +608,7 @@ return (
 <div>
 <h3 className="text-white text-lg font-bold mb-3">📣 Ankündigungen</h3>
 <div className="grid md:grid-cols-2 gap-4 items-start">
-{announcements.map(a => (
+{announcements.map((a, idx) => (
 <div key={a.id} className="bg-slate-800 rounded-lg border border-slate-700 relative overflow-hidden self-start">
 {a.img && <img src={a.img} className="w-full h-auto block" />}
 <div className="p-4">
@@ -606,7 +616,13 @@ return (
 {a.title && <h3 className="text-white font-bold mt-1">{a.title}</h3>}
 {a.desc && <p className="text-slate-300 text-sm mt-1">{a.desc}</p>}
 </div>
-{isAdmin && <button onClick={() => delAnn(a.id)} className="absolute top-2 right-2 text-red-400 bg-slate-900/70 rounded-full w-8 h-8">🗑️</button>}
+{isAdmin && (
+<div className="absolute top-2 right-2 flex gap-1">
+<button onClick={() => moveAnn(a.id, -1)} disabled={idx === 0} className={"bg-slate-900/70 rounded-full w-8 h-8 text-white " + (idx === 0 ? 'opacity-30' : 'hover:bg-slate-700')} title="Nach oben">▲</button>
+<button onClick={() => moveAnn(a.id, 1)} disabled={idx === announcements.length - 1} className={"bg-slate-900/70 rounded-full w-8 h-8 text-white " + (idx === announcements.length - 1 ? 'opacity-30' : 'hover:bg-slate-700')} title="Nach unten">▼</button>
+<button onClick={() => delAnn(a.id)} className="text-red-400 bg-slate-900/70 rounded-full w-8 h-8 hover:bg-slate-700" title="Löschen">🗑️</button>
+</div>
+)}
 </div>
 ))}
 {announcements.length === 0 && <p className="text-slate-500 text-sm">Keine Ankündigungen</p>}
