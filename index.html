@@ -46,15 +46,20 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 // Firebase-Funktionen global verfügbar machen für die React-App
 window.fb = {
-// Wert speichern (key -> beliebiges JSON)
 set: async (key, value) => {
 await setDoc(doc(db, "shared", key), { value: JSON.stringify(value) });
 },
-// Wert löschen
 del: async (key) => {
 await deleteDoc(doc(db, "shared", key));
 },
-// Echtzeit-Listener: ruft cb(value) bei jeder Änderung auf
+listenCollection: (name, cb) => {
+const q = query(collection(db, name), orderBy("createdAt", "desc"));
+return onSnapshot(q, (snap) => {
+const items = [];
+snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+cb(items);
+}, (err) => { console.warn("Firestore listenCollection error:", name, err); });
+},
 listen: (key, cb) => {
 return onSnapshot(doc(db, "shared", key), (snap) => {
 if (snap.exists() && snap.data().value) {
