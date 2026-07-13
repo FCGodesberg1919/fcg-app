@@ -520,6 +520,7 @@ return (
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin: canEdit, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd, deleteMessage, editMessage, canDeleteAll: isAdmin || isVorstand }} />}
 {page === 'members' && <MembersPage {...{ members, isAdmin: canEdit, removeMember }} />}
+{page === 'einwilligungen' && isAdmin && <EinwilligungenPage {...{ einwilligungen }} />}
 {page === 'admin' && <AdminPage {...{ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
 </main>
 </div>
@@ -1109,7 +1110,76 @@ return (
 </div>
 );
 }
-function AdminPage({ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
+function EinwilligungenPage({ einwilligungen }) {
+const [suche, setSuche] = useState('');
+const gefiltert = einwilligungen.filter(e => {
+const text = (e.kind_vorname + ' ' + e.kind_nachname + ' ' + e.eltern_name).toLowerCase();
+return text.includes(suche.toLowerCase());
+});
+
+async function weiterleiten(e) {
+const text = '✅ Datenschutz-Bestätigung – 1. FC Godesberg\n\n'
++ 'Spieler: ' + e.kind_vorname + ' ' + e.kind_nachname + '\n'
++ 'Geburtsdatum: ' + e.kind_geburtsdatum + '\n'
++ 'Erziehungsberechtigte/r: ' + e.eltern_name + '\n'
++ 'E-Mail: ' + e.eltern_email + '\n'
++ 'Bestätigt am: ' + e.zeitstempel;
+try {
+if (navigator.share) {
+await navigator.share({ title: 'Datenschutz-Bestätigung', text });
+return;
+}
+} catch (err) { console.warn('Teilen abgebrochen oder nicht möglich:', err); return; }
+try {
+await navigator.clipboard.writeText(text);
+alert('Kein direktes Teilen möglich – Text wurde in die Zwischenablage kopiert.');
+} catch (err) {
+alert(text);
+}
+}
+
+function csvExport() {
+const header = ['Spieler Vorname', 'Spieler Nachname', 'Geburtsdatum', 'Erziehungsberechtigte/r', 'E-Mail', 'Bestätigt am'];
+const rows = gefiltert.map(e => [e.kind_vorname, e.kind_nachname, e.kind_geburtsdatum, e.eltern_name, e.eltern_email, e.zeitstempel]);
+const csv = [header, ...rows].map(r => r.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(';')).join('\n');
+const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'einwilligungen_' + new Date().toLocaleDateString('de-DE').replace(/\./g, '-') + '.csv';
+a.click();
+URL.revokeObjectURL(url);
+}
+
+return (
+<div className="space-y-4">
+<h2 className="text-2xl font-bold text-white">✅ Einwilligungen ({einwilligungen.length})</h2>
+<p className="text-slate-400 text-sm">Alle bestätigten Datenschutzerklärungen, neueste zuerst. Bleibt dauerhaft gespeichert.</p>
+<div className="flex gap-2">
+<input placeholder="Suche nach Name..." value={suche} onChange={e => setSuche(e.target.value)} className="flex-1 bg-slate-700 text-white rounded-lg px-4 py-2 text-sm" />
+<button onClick={csvExport} className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">⬇️ CSV Export</button>
+</div>
+<div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700">
+{gefiltert.length === 0 && <p className="text-slate-500 p-6 text-center">Keine Einträge gefunden</p>}
+{gefiltert.map(e => (
+<div key={e.id} className="p-4">
+<div className="flex items-start justify-between gap-2">
+<div>
+<p className="text-white font-semibold">{e.kind_vorname} {e.kind_nachname} <span className="text-slate-400 font-normal text-sm">· geb. {e.kind_geburtsdatum}</span></p>
+<p className="text-slate-300 text-sm mt-1">Erziehungsberechtigte/r: {e.eltern_name}</p>
+<p className="text-slate-400 text-xs mt-0.5">{e.eltern_email}</p>
+</div>
+<div className="flex flex-col items-end gap-2 shrink-0">
+<span className="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded-lg whitespace-nowrap">✓ {e.zeitstempel}</span>
+<button onClick={() => weiterleiten(e)} className="text-slate-300 hover:text-white text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg whitespace-nowrap">📤 Weiterleiten</button>
+</div>
+</div>
+</div>
+))}
+</div>
+</div>
+);
+}function AdminPage({ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
 if (!isAdmin && !isVorstand) return (
 <div className="space-y-6">
 <h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
