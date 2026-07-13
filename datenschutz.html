@@ -24,138 +24,29 @@
             padding: 20px;
             text-align: center;
         }
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-        }
-        .header p {
-            margin: 5px 0 0 0;
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        .text-section {
-            padding: 20px;
-            background: #f9f9f9;
-            border-bottom: 3px solid #8b0000;
-        }
-        .pdf-info {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            font-size: 13px;
-            color: #856404;
-        }
-        .text-section iframe {
-            width: 100%;
-            height: 450px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .pdf-button {
-            display: block;
-            text-align: center;
-            background: #8b0000;
-            color: white;
-            text-decoration: none;
-            padding: 12px;
-            border-radius: 5px;
-            margin-top: 15px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .pdf-button:hover {
-            background: #a00000;
-        }
-        .form-section {
-            padding: 25px;
-        }
-        .form-section h3 {
-            color: #8b0000;
-            margin-bottom: 20px;
-            font-size: 16px;
-        }
-        .form-section h4 {
-            color: #8b0000;
-            font-size: 15px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-        input[type="text"],
-        input[type="email"],
-        input[type="date"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        input:focus {
-            outline: none;
-            border-color: #8b0000;
-            background: #fff8f8;
-        }
-        .checkbox-group {
-            margin: 15px 0;
-            padding: 15px;
-            background: #fff8f8;
-            border-radius: 5px;
-        }
-        .checkbox-group label {
-            display: flex;
-            align-items: flex-start;
-            font-weight: normal;
-            margin: 0;
-            cursor: pointer;
-        }
-        .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-            margin-top: 3px;
-            cursor: pointer;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: #8b0000;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-top: 10px;
-        }
-        button:hover:not(:disabled) {
-            background: #a00000;
-        }
-        .success {
-            display: none;
-            background: #d4edda;
-            border: 1px solid #28a745;
-            color: #155724;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            margin-top: 15px;
-        }
-        .timestamp {
-            text-align: center;
-            color: #999;
-            font-size: 12px;
-            margin-top: 10px;
-        }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.9; }
+        .text-section { padding: 20px; background: #f9f9f9; border-bottom: 3px solid #8b0000; }
+        .pdf-info { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; color: #856404; }
+        .text-section iframe { width: 100%; height: 450px; border: 1px solid #ddd; border-radius: 5px; }
+        .pdf-button { display: block; text-align: center; background: #8b0000; color: white; text-decoration: none; padding: 12px; border-radius: 5px; margin-top: 15px; font-size: 14px; font-weight: bold; }
+        .pdf-button:hover { background: #a00000; }
+        .form-section { padding: 25px; }
+        .form-section h3 { color: #8b0000; margin-bottom: 20px; font-size: 16px; }
+        .form-section h4 { color: #8b0000; font-size: 15px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; color: #333; margin-bottom: 5px; font-size: 14px; }
+        input[type="text"], input[type="email"], input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+        input:focus { outline: none; border-color: #8b0000; background: #fff8f8; }
+        .checkbox-group { margin: 15px 0; padding: 15px; background: #fff8f8; border-radius: 5px; }
+        .checkbox-group label { display: flex; align-items: flex-start; font-weight: normal; margin: 0; cursor: pointer; }
+        .checkbox-group input[type="checkbox"] { width: auto; margin-right: 10px; margin-top: 3px; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #8b0000; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        button:hover:not(:disabled) { background: #a00000; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .success { display: none; background: #d4edda; border: 1px solid #28a745; color: #155724; padding: 15px; border-radius: 5px; text-align: center; margin-top: 15px; }
+        .error-box { display: none; background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 12px; border-radius: 5px; text-align: center; margin-top: 15px; font-size: 13px; }
+        .timestamp { text-align: center; color: #999; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -219,50 +110,75 @@
                     </label>
                 </div>
 
-                <button type="submit">✓ Absenden</button>
+                <button type="submit" id="submitBtn">✓ Absenden</button>
 
                 <div class="success" id="success">
                     ✓ Erfolgreich abgesendet!<br>
                     <div class="timestamp" id="zeit"></div>
                 </div>
+
+                <div class="error-box" id="errorBox">
+                    ⚠️ Es gab ein Problem beim Absenden. Bitte versuche es erneut oder wende dich an den Verein.
+                </div>
             </form>
         </div>
     </div>
 
-    <script>
-        document.getElementById('form').addEventListener('submit', async function(e) {
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBL6sD5N38sRygqaJdQBNq-6NAE51CyCDw",
+            authDomain: "fcgapp-2026-intern.firebaseapp.com",
+            projectId: "fcgapp-2026-intern",
+            storageBucket: "fcgapp-2026-intern.firebasestorage.app",
+            messagingSenderId: "200140077097",
+            appId: "1:200140077097:web:570c5e6b10f36dd7850438"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('form').addEventListener('submit', async function (e) {
             e.preventDefault();
 
-            const kindVorname = document.getElementById('kind_vorname').value;
-            const kindNachname = document.getElementById('kind_nachname').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const errorBox = document.getElementById('errorBox');
+            errorBox.style.display = 'none';
+
+            const kindVorname = document.getElementById('kind_vorname').value.trim();
+            const kindNachname = document.getElementById('kind_nachname').value.trim();
             const kindGeburtsdatum = document.getElementById('kind_geburtsdatum').value;
-            const elternName = document.getElementById('eltern_name').value;
-            const elternEmail = document.getElementById('eltern_email').value;
+            const elternName = document.getElementById('eltern_name').value.trim();
+            const elternEmail = document.getElementById('eltern_email').value.trim();
             const jetzt = new Date();
             const zeitstempel = jetzt.toLocaleString('de-DE');
 
-            const formData = new FormData();
-            formData.append('Spieler Vorname', kindVorname);
-            formData.append('Spieler Nachname', kindNachname);
-            formData.append('Spieler Geburtsdatum', kindGeburtsdatum);
-            formData.append('Erziehungsberechtigte/r', elternName);
-            formData.append('E-Mail', elternEmail);
-            formData.append('Datenschutz akzeptiert', 'JA');
-            formData.append('Zeitstempel', zeitstempel);
-            formData.append('_subject', `Anmeldung: ${kindVorname} ${kindNachname}`);
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Wird gesendet...';
 
             try {
-                await fetch('https://formspree.io/f/xlgyrwop', {
-                    method: 'POST',
-                    body: formData
+                await addDoc(collection(db, "einwilligungen"), {
+                    kind_vorname: kindVorname,
+                    kind_nachname: kindNachname,
+                    kind_geburtsdatum: kindGeburtsdatum,
+                    eltern_name: elternName,
+                    eltern_email: elternEmail,
+                    akzeptiert: true,
+                    zeitstempel: zeitstempel,
+                    createdAt: serverTimestamp()
                 });
-            } catch (err) {
-                console.log('Email konnte nicht versendet werden');
-            }
 
-            document.getElementById('form').style.display = 'none';
-            document.getElementById('success').style.display = 'block';
-            document.getElementById('zeit').innerHTML = `Akzeptiert: ${zeitstempel}`;
+                document.getElementById('form').style.display = 'none';
+                document.getElementById('success').style.display = 'block';
+                document.getElementById('zeit').innerHTML = `Akzeptiert: ${zeitstempel}`;
+            } catch (err) {
+                console.error('Firestore-Fehler:', err);
+                errorBox.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✓ Absenden';
+            }
         });
     </script>
 </body>
