@@ -26,6 +26,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>body{background:#0f172a;} ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px;}</style>
 </head>
@@ -51,6 +52,9 @@ await setDoc(doc(db, "shared", key), { value: JSON.stringify(value) });
 },
 del: async (key) => {
 await deleteDoc(doc(db, "shared", key));
+},
+delDoc: async (col, id) => {
+await deleteDoc(doc(db, col, id));
 },
 listenCollection: (name, cb) => {
 const q = query(collection(db, name), orderBy("createdAt", "desc"));
@@ -437,6 +441,7 @@ reader.readAsDataURL(file);
 function removePlatz() { window.fb.del('platzImg'); window.fb.del('platzImg2'); window.fb.del('platzTyp'); }
 function addForm(item) { window.fb.set('forms', [{ ...item, id: Date.now() }, ...forms]); }
 function delForm(id) { window.fb.set('forms', forms.filter(f => f.id !== id)); }
+function delEinwilligung(id) { if (confirm('Diesen Eintrag wirklich löschen?')) window.fb.delDoc('einwilligungen', id); }
 // Intro
 if (showIntro) return <Intro onDone={() => setShowIntro(false)} />;
 // Verbindung wird aufgebaut
@@ -520,7 +525,7 @@ return (
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin: canEdit, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd, deleteMessage, editMessage, canDeleteAll: isAdmin || isVorstand }} />}
 {page === 'members' && <MembersPage {...{ members, isAdmin: canEdit, removeMember }} />}
-{page === 'einwilligungen' && isAdmin && <EinwilligungenPage {...{ einwilligungen }} />}
+{page === 'einwilligungen' && isAdmin && <EinwilligungenPage {...{ einwilligungen, delEinwilligung }} />}
 {page === 'admin' && <AdminPage {...{ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
 </main>
 </div>
