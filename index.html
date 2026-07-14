@@ -1115,32 +1115,53 @@ return (
 </div>
 );
 }
-function EinwilligungenPage({ einwilligungen }) {
+function EinwilligungenPage({ einwilligungen, delEinwilligung }) {
 const [suche, setSuche] = useState('');
 const gefiltert = einwilligungen.filter(e => {
 const text = (e.kind_vorname + ' ' + e.kind_nachname + ' ' + e.eltern_name).toLowerCase();
 return text.includes(suche.toLowerCase());
 });
 
-async function weiterleiten(e) {
-const text = '✅ Datenschutz-Bestätigung – 1. FC Godesberg\n\n'
-+ 'Spieler: ' + e.kind_vorname + ' ' + e.kind_nachname + '\n'
-+ 'Geburtsdatum: ' + e.kind_geburtsdatum + '\n'
-+ 'Erziehungsberechtigte/r: ' + e.eltern_name + '\n'
-+ 'E-Mail: ' + e.eltern_email + '\n'
-+ 'Bestätigt am: ' + e.zeitstempel;
+function erstellePdf(e) {
+const { jsPDF } = window.jspdf;
+const docu = new jsPDF();
+docu.setFontSize(16);
+docu.text('Datenschutz-Bestätigung', 20, 20);
+docu.setFontSize(11);
+docu.text('1. FC Godesberg 1919/22', 20, 28);
+docu.line(20, 32, 190, 32);
+docu.setFontSize(12);
+let y = 45;
+docu.text('Spieler: ' + e.kind_vorname + ' ' + e.kind_nachname, 20, y); y += 8;
+docu.text('Geburtsdatum: ' + e.kind_geburtsdatum, 20, y); y += 8;
+docu.text('Erziehungsberechtigte/r: ' + e.eltern_name, 20, y); y += 8;
+docu.text('E-Mail: ' + e.eltern_email, 20, y); y += 8;
+docu.text('Bestätigt am: ' + e.zeitstempel, 20, y); y += 8;
+docu.text('Status: Datenschutzerklärung akzeptiert ✓', 20, y);
+return docu;
+}
+
+function pdfOeffnen(e) {
+const docu = erstellePdf(e);
+const blobUrl = docu.output('bloburl');
+window.open(blobUrl, '_blank');
+}
+
+async function pdfWeiterleiten(e) {
+const docu = erstellePdf(e);
+const blob = docu.output('blob');
+const dateiname = 'Datenschutz_' + e.kind_vorname + '_' + e.kind_nachname + '.pdf';
+const file = new File([blob], dateiname, { type: 'application/pdf' });
 try {
-if (navigator.share) {
-await navigator.share({ title: 'Datenschutz-Bestätigung', text });
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+await navigator.share({ files: [file], title: 'Datenschutz-Bestätigung' });
 return;
 }
-} catch (err) { console.warn('Teilen abgebrochen oder nicht möglich:', err); return; }
-try {
-await navigator.clipboard.writeText(text);
-alert('Kein direktes Teilen möglich – Text wurde in die Zwischenablage kopiert.');
-} catch (err) {
-alert(text);
-}
+} catch (err) { console.warn('Teilen abgebrochen:', err); return; }
+const a = document.createElement('a');
+a.href = URL.createObjectURL(blob);
+a.download = dateiname;
+a.click();
 }
 
 function csvExport() {
@@ -1161,8 +1182,8 @@ return (
 <h2 className="text-2xl font-bold text-white">✅ Einwilligungen ({einwilligungen.length})</h2>
 <p className="text-slate-400 text-sm">Alle bestätigten Datenschutzerklärungen, neueste zuerst. Bleibt dauerhaft gespeichert.</p>
 <div className="flex gap-2">
-<input placeholder="Suche nach Name..." value={suche} onChange={e => setSuche(e.target.value)} className="flex-1 bg-slate-700 text-white rounded-lg px-4 py-2 text-sm" />
-<button onClick={csvExport} className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">⬇️ CSV Export</button>
+<input placeholder="Suche nach Vor-, Nachname oder Elternname..." value={suche} onChange={e => setSuche(e.target.value)} className="flex-1 bg-slate-700 text-white rounded-lg px-4 py-2 text-sm" />
+<button onClick={csvExport} className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">⬇️ CSV</button>
 </div>
 <div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700">
 {gefiltert.length === 0 && <p className="text-slate-500 p-6 text-center">Keine Einträge gefunden</p>}
@@ -1174,17 +1195,19 @@ return (
 <p className="text-slate-300 text-sm mt-1">Erziehungsberechtigte/r: {e.eltern_name}</p>
 <p className="text-slate-400 text-xs mt-0.5">{e.eltern_email}</p>
 </div>
-<div className="flex flex-col items-end gap-2 shrink-0">
-<span className="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded-lg whitespace-nowrap">✓ {e.zeitstempel}</span>
-<button onClick={() => weiterleiten(e)} className="text-slate-300 hover:text-white text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg whitespace-nowrap">📤 Weiterleiten</button>
+<span className="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded-lg whitespace-nowrap shrink-0">✓ {e.zeitstempel}</span>
 </div>
+<div className="flex gap-2 mt-3">
+<button onClick={() => pdfOeffnen(e)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-xs font-semibold">📄 PDF öffnen</button>
+<button onClick={() => pdfWeiterleiten(e)} className="flex-1 bg-green-700 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-semibold">📤 Weiterleiten</button>
+<button onClick={() => delEinwilligung(e.id)} className="bg-red-900/40 hover:bg-red-800 text-red-300 py-2 px-3 rounded-lg text-xs font-semibold">🗑️</button>
 </div>
 </div>
 ))}
 </div>
 </div>
 );
-}function AdminPage({ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }) {
+}
 if (!isAdmin && !isVorstand) return (
 <div className="space-y-6">
 <h2 className="text-2xl font-bold text-white">⚙️ Admin-Bereich</h2>
