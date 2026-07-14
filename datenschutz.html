@@ -127,6 +127,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBL6sD5N38sRygqaJdQBNq-6NAE51CyCDw",
@@ -139,6 +140,8 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+const auth = getAuth(app);
+signInAnonymously(auth).catch((err) => console.error("Anmeldung fehlgeschlagen:", err));
 
         document.getElementById('form').addEventListener('submit', async function (e) {
             e.preventDefault();
