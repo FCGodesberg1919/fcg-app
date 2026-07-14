@@ -35,6 +35,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 const firebaseConfig = {
 apiKey: "AIzaSyBL6sD5N38sRygqaJdQBNq-6NAE51CyCDw",
 authDomain: "fcgapp-2026-intern.firebaseapp.com",
@@ -45,6 +46,10 @@ appId: "1:200140077097:web:570c5e6b10f36dd7850438"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+signInAnonymously(auth).then(() => {
+window.dispatchEvent(new Event("fb-ready"));
+}).catch((err) => console.error("Anmeldung fehlgeschlagen:", err));
 // Firebase-Funktionen global verfügbar machen für die React-App
 window.fb = {
 set: async (key, value) => {
@@ -74,7 +79,6 @@ cb(null);
 }, (err) => { console.warn("Firestore listen error:", key, err); });
 }
 };
-window.dispatchEvent(new Event("fb-ready"));
 </script>
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef } = React;
