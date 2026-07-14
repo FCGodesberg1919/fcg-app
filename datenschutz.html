@@ -115,6 +115,8 @@
                 <div class="success" id="success">
                     ✓ Erfolgreich abgesendet!<br>
                     <div class="timestamp" id="zeit"></div>
+                    <button type="button" id="pdfAnsehenBtn" style="margin-top:12px;">📄 Meine Bestätigung als PDF ansehen</button>
+                    <button type="button" id="pdfTeilenBtn" style="margin-top:8px; background:#155724;">📤 PDF weiterleiten</button>
                 </div>
 
                 <div class="error-box" id="errorBox">
@@ -124,6 +126,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -140,8 +143,8 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-const auth = getAuth(app);
-signInAnonymously(auth).catch((err) => console.error("Anmeldung fehlgeschlagen:", err));
+        const auth = getAuth(app);
+        signInAnonymously(auth).catch((err) => console.error("Anmeldung fehlgeschlagen:", err));
 
         document.getElementById('form').addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -176,12 +179,65 @@ signInAnonymously(auth).catch((err) => console.error("Anmeldung fehlgeschlagen:"
                 document.getElementById('form').style.display = 'none';
                 document.getElementById('success').style.display = 'block';
                 document.getElementById('zeit').innerHTML = `Akzeptiert: ${zeitstempel}`;
+
+                window._letzteBestaetigung = {
+                    kind_vorname: kindVorname,
+                    kind_nachname: kindNachname,
+                    kind_geburtsdatum: kindGeburtsdatum,
+                    eltern_name: elternName,
+                    eltern_email: elternEmail,
+                    zeitstempel: zeitstempel
+                };
             } catch (err) {
                 console.error('Firestore-Fehler:', err);
                 errorBox.style.display = 'block';
                 submitBtn.disabled = false;
                 submitBtn.textContent = '✓ Absenden';
             }
+        });
+
+        function erstellePdf(e) {
+            const { jsPDF } = window.jspdf;
+            const docu = new jsPDF();
+            docu.setFontSize(16);
+            docu.text('Datenschutz-Bestaetigung', 20, 20);
+            docu.setFontSize(11);
+            docu.text('1. FC Godesberg 1919/22', 20, 28);
+            docu.line(20, 32, 190, 32);
+            docu.setFontSize(12);
+            let y = 45;
+            docu.text('Spieler: ' + e.kind_vorname + ' ' + e.kind_nachname, 20, y); y += 8;
+            docu.text('Geburtsdatum: ' + e.kind_geburtsdatum, 20, y); y += 8;
+            docu.text('Erziehungsberechtigte/r: ' + e.eltern_name, 20, y); y += 8;
+            docu.text('E-Mail: ' + e.eltern_email, 20, y); y += 8;
+            docu.text('Bestaetigt am: ' + e.zeitstempel, 20, y); y += 8;
+            docu.text('Status: Datenschutzerklaerung akzeptiert (JA)', 20, y);
+            return docu;
+        }
+
+        document.getElementById('pdfAnsehenBtn').addEventListener('click', function () {
+            if (!window._letzteBestaetigung) return;
+            const docu = erstellePdf(window._letzteBestaetigung);
+            window.open(docu.output('bloburl'), '_blank');
+        });
+
+        document.getElementById('pdfTeilenBtn').addEventListener('click', async function () {
+            if (!window._letzteBestaetigung) return;
+            const e = window._letzteBestaetigung;
+            const docu = erstellePdf(e);
+            const blob = docu.output('blob');
+            const dateiname = 'Datenschutz_' + e.kind_vorname + '_' + e.kind_nachname + '.pdf';
+            const file = new File([blob], dateiname, { type: 'application/pdf' });
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: 'Datenschutz-Bestätigung' });
+                    return;
+                }
+            } catch (err) { console.warn('Teilen abgebrochen:', err); return; }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = dateiname;
+            a.click();
         });
     </script>
 </body>
