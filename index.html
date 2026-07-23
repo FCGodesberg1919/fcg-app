@@ -505,7 +505,6 @@ const nav = [
 { id: 'forms', label: '📄 Formulare' },
 { id: 'chat', label: '💬 Chat' },
 { id: 'members', label: '👥 Mitglieder' },
-...((isAdmin || isVorstand) ? [{ id: 'einwilligungen', label: '✅ Einwilligungen' }] : []),
 { id: 'admin', label: '⚙️ Admin' },
 ];
 return (
@@ -541,7 +540,6 @@ return (
 {page === 'cancellations' && <CancellationsPage {...{ cancellations, isAdmin: canEdit, nickname, delCancellation }} />}
 {page === 'chat' && <ChatPage {...{ messages, nickname, newMsg, setNewMsg, sendMessage, chatEnd, deleteMessage, editMessage, canDeleteAll: isAdmin || isVorstand }} />}
 {page === 'members' && <MembersPage {...{ members, isAdmin: canEdit, removeMember }} />}
-{page === 'einwilligungen' && (isAdmin || isVorstand) && <EinwilligungenPage {...{ einwilligungen, delEinwilligung }} />}
 {page === 'admin' && <AdminPage {...{ isAdmin, isVorstand, nickname, members, cancellations, setPage, trainers, addTrainer, delTrainer }} />}
 </main>
 </div>
